@@ -3,6 +3,9 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 
 const KEY = "edi_goals_v1";
+const DRAFTS_KEY = "edi_goals_drafts_v1";
+const WIZARD_FIELDS = ["gTitle", "gSpecific", "gCategory", "gMetric", "gTarget", "gUnit",
+  "gRelevant", "gPriority", "gDeadline", "gStart"];
 const SMART_STEPS = ["specific", "measurable", "achievable", "relevant", "timebound"];
 const STEP_LABELS = {
   specific: "Specific",
@@ -14,6 +17,7 @@ const STEP_LABELS = {
 
 let state = {
   goals: [],
+  wizardDrafts: {},
   filters: { category: "", status: "" },
   wizard: {
     step: 0,
@@ -23,6 +27,7 @@ let state = {
   },
   detailId: null,
 };
+let wizardDraftSaveTimer = null;
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 function load() {
@@ -31,6 +36,13 @@ function load() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed.goals)) state.goals = parsed.goals;
+    }
+    const drafts = appStorage.getItem(DRAFTS_KEY);
+    if (drafts) {
+      const parsedDrafts = JSON.parse(drafts);
+      if (parsedDrafts && typeof parsedDrafts === "object" && !Array.isArray(parsedDrafts)) {
+        state.wizardDrafts = parsedDrafts;
+      }
     }
   } catch (e) {
     console.error("Failed to load goals:", e);
@@ -232,11 +244,14 @@ function render() {
 
 // ── Wizard ───────────────────────────────────────────────────────────────────
 function openWizard(editGoalId = null) {
+  const draftKey = editGoalId || "new";
+  const savedDraft = state.wizardDrafts[draftKey];
   state.wizard = {
-    step: 0,
+    step: savedDraft?.step ?? 0,
     draftId: editGoalId,
-    draftTasks: [],
+    draftTasks: savedDraft?.tasks?.map((task) => ({ ...task })) || [],
     editGoalId,
+    draftKey,
   };
 
   const form = $("wizardForm");
@@ -245,7 +260,11 @@ function openWizard(editGoalId = null) {
   $("wizardEyebrow").textContent = editGoalId ? "Edit Goal" : "New Goal";
   $("wizardTitle").textContent = editGoalId ? "Refine this SMART goal" : "Define a SMART goal";
 
-  if (editGoalId) {
+  if (savedDraft) {
+    for (const field of WIZARD_FIELDS) {
+      if (Object.hasOwn(savedDraft.fields || {}, field)) $(field).value = savedDraft.fields[field];
+    }
+  } else if (editGoalId) {
     const g = state.goals.find((x) => x.id === editGoalId);
     if (g) {
       $("gTitle").value = g.title || "";
@@ -268,14 +287,33 @@ function openWizard(editGoalId = null) {
   renderCategoryDatalist();
   renderWizardTasks();
   clearWizardError();
-  showWizardStep(0);
+  showWizardStep(state.wizard.step);
   $("wizardModal").showModal();
   setTimeout(() => $("gTitle").focus(), 60);
 }
 
-function closeWizard() {
+function persistWizardDraft() {
+  if (!state.wizard.draftKey) return;
+  state.wizardDrafts[state.wizard.draftKey] = {
+    step: state.wizard.step,
+    fields: Object.fromEntries(WIZARD_FIELDS.map((field) => [field, $(field).value])),
+    tasks: state.wizard.draftTasks.map((task) => ({ ...task })),
+  };
+  clearTimeout(wizardDraftSaveTimer);
+  wizardDraftSaveTimer = setTimeout(() => {
+    wizardDraftSaveTimer = null;
+    appStorage.setItem(DRAFTS_KEY, JSON.stringify(state.wizardDrafts));
+  }, 250);
+}
+
+function closeWizard({ preserve = true } = {}) {
+  if (preserve) {
+    persistWizardDraft();
+    clearTimeout(wizardDraftSaveTimer);
+    wizardDraftSaveTimer = null;
+    appStorage.setItem(DRAFTS_KEY, JSON.stringify(state.wizardDrafts));
+  }
   $("wizardModal").close();
-  state.wizard = { step: 0, draftId: null, draftTasks: [], editGoalId: null };
 }
 
 function renderCategoryDatalist() {
@@ -295,17 +333,34 @@ function renderWizardTasks() {
     .map(
       (t, i) => `
       <li>
-        <span>${escapeHtml(t.title)}</span>
-        <button type="button" data-i="${i}" aria-label="Remove">×</button>
+        <input class="input task-edit-input" data-i="${i}" aria-label="Checklist item ${i + 1}" maxlength="150" value="${escapeHtml(t.title)}">
+        <span class="task-order-actions">
+          <button type="button" data-action="up" data-i="${i}" aria-label="Move item up" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" data-action="down" data-i="${i}" aria-label="Move item down" ${i === state.wizard.draftTasks.length - 1 ? "disabled" : ""}>↓</button>
+          <button type="button" data-action="remove" data-i="${i}" aria-label="Remove item">×</button>
+        </span>
       </li>
     `
     )
     .join("");
+  ul.querySelectorAll(".task-edit-input").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.wizard.draftTasks[Number(input.dataset.i)].title = input.value;
+      persistWizardDraft();
+    });
+  });
   ul.querySelectorAll("button").forEach((b) => {
     b.addEventListener("click", () => {
       const i = Number(b.dataset.i);
-      state.wizard.draftTasks.splice(i, 1);
+      const action = b.dataset.action;
+      if (action === "remove") state.wizard.draftTasks.splice(i, 1);
+      else {
+        const destination = action === "up" ? i - 1 : i + 1;
+        [state.wizard.draftTasks[i], state.wizard.draftTasks[destination]] =
+          [state.wizard.draftTasks[destination], state.wizard.draftTasks[i]];
+      }
       renderWizardTasks();
+      persistWizardDraft();
     });
   });
 }
@@ -318,6 +373,7 @@ function addWizardTask() {
   input.value = "";
   clearWizardError();
   renderWizardTasks();
+  persistWizardDraft();
   input.focus();
 }
 
@@ -343,6 +399,7 @@ function showWizardStep(step) {
   $("nextStepBtn").hidden = isLast;
   $("wizardSubmit").hidden = !isLast;
   clearWizardError();
+  persistWizardDraft();
 }
 
 function setWizardError(message) {
@@ -422,7 +479,11 @@ function handleWizardSubmit(e) {
   }
   save();
   render();
-  closeWizard();
+  delete state.wizardDrafts[state.wizard.draftKey];
+  clearTimeout(wizardDraftSaveTimer);
+  wizardDraftSaveTimer = null;
+  appStorage.setItem(DRAFTS_KEY, JSON.stringify(state.wizardDrafts));
+  closeWizard({ preserve: false });
 
   // If we opened from detail, refresh detail panel
   if (state.detailId === id) openDetail(id);
@@ -565,8 +626,9 @@ function handleGoalNotesInput() {
 
 function editCurrentGoal() {
   if (!state.detailId) return;
+  const goalId = state.detailId;
   closeDetail();
-  openWizard(state.detailId);
+  openWizard(goalId);
 }
 
 function deleteCurrentGoal() {
@@ -600,11 +662,17 @@ function setupEventListeners() {
 
   $("closeWizard").addEventListener("click", closeWizard);
   $("wizardForm").addEventListener("submit", handleWizardSubmit);
+  $("wizardForm").addEventListener("input", persistWizardDraft);
+  $("wizardForm").addEventListener("change", persistWizardDraft);
   $("wizardForm").addEventListener("click", (e) => {
     if (e.target === $("wizardForm")) closeWizard();
   });
   $("wizardModal").addEventListener("click", (e) => {
     if (e.target === $("wizardModal")) closeWizard();
+  });
+  $("wizardModal").addEventListener("cancel", (e) => {
+    e.preventDefault();
+    closeWizard();
   });
 
   $("prevStepBtn").addEventListener("click", prevStep);

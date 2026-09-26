@@ -487,12 +487,15 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.55; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   padding: 9px 12px;
   border-radius: var(--radius-sm);
   font-size: 14px;
 }
+.task-edit-input { min-width: 0; flex: 1; padding: 7px 9px; }
+.task-order-actions { display: inline-flex; align-items: center; gap: 2px; }
 .task-preview li button {
   background: transparent;
   border: 0;
@@ -502,6 +505,11 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.55; }
   padding: 0 4px;
 }
 .task-preview li button:hover { color: var(--danger); }
+.task-preview li button:disabled { opacity: .35; cursor: default; }
+.task-preview li button[data-action="up"],
+.task-preview li button[data-action="down"] { color: var(--text-secondary); }
+.task-preview li button[data-action="up"]:hover,
+.task-preview li button[data-action="down"]:hover { color: var(--accent); }
 
 .wizard-actions {
   display: flex;
