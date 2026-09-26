@@ -229,6 +229,7 @@ button { cursor: pointer; }
   z-index: 2;
 }
 .sticky.editing .note-format { display: flex; }
+.sticky.editing .note-format { right: 46px; }
 .note-format select {
   min-width: 0;
   flex: 1;
@@ -297,6 +298,12 @@ button { cursor: pointer; }
 }
 
 .sticky .sticky-body:focus { outline: none; }
+.voice-input { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.voice-input svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.voice-input:hover:not(:disabled), .voice-input.recording { color: var(--accent); border-color: var(--accent); }
+.voice-input:disabled { opacity: .45; cursor: not-allowed; }
+.sticky .sticky-voice-input { display: none; position: absolute; top: 8px; right: 10px; z-index: 3; }
+.sticky.editing .sticky-voice-input { display: grid; }
 .sticky .sticky-body[hidden], .sticky .markdown-preview[hidden] { display: none; }
 .sticky .sticky-body::placeholder { color: var(--text-tertiary); }
 .markdown-preview { height: 100%; overflow: auto; overflow-wrap: anywhere; user-select: text; cursor: text; line-height: 1.5; }

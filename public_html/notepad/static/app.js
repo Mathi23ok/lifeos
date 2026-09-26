@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch {}
   const input = $('notepadInput'), preview = $('notepadPreview'), status = $('saveStatus'), shell = $('editorShell');
+  const voiceButton = window.addVoiceInputButton(input, 'notepad-voice-input');
+  document.querySelector('.write-pane').append(voiceButton);
   input.value = body; preview.innerHTML = markdown(body);
   let timer;
   const save = () => { appStorage.setItem(KEY, JSON.stringify({body: input.value, updatedAt: Date.now()})); status.textContent = 'Saved'; };

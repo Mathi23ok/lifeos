@@ -317,6 +317,7 @@ function renderSticky(note) {
   body.value = note.body || (note.title || "");
   body.placeholder = "Write Markdown…";
   body.setAttribute("aria-label", "Markdown source");
+  const voiceButton = window.addVoiceInputButton(body, "sticky-voice-input");
   const preview = document.createElement("div");
   preview.className = "markdown-preview";
   preview.innerHTML = renderMarkdown(body.value);
@@ -408,7 +409,7 @@ function renderSticky(note) {
   resize.setAttribute("aria-label", "Resize note");
   resize.title = "Resize";
 
-  el.append(format, preview, body, revealBtn, swatch, actions, resize);
+  el.append(format, preview, body, voiceButton, revealBtn, swatch, actions, resize);
   bindDrag(el, note);
   bindResize(el, note, resize);
   bindEdit(el, note, body, preview, format);
@@ -583,7 +584,7 @@ function bindEdit(el, note, body, preview, format) {
 
   el.addEventListener("dblclick", (e) => {
     if (state.connectFrom) return;
-    if (e.target.closest(".actions, .swatch, .note-format, .reveal-note, a")) return;
+    if (e.target.closest(".actions, .swatch, .note-format, .reveal-note, .voice-input, a")) return;
     if (!el.classList.contains("editing")) enter();
   });
 
