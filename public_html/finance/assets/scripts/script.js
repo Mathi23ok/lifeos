@@ -159,31 +159,12 @@ function prefersReducedMotion() {
 // Tween a numeric readout from its previous value to the new one.
 function animateNumber(el, target, format) {
   if (!el || !Number.isFinite(target)) return;
-  const start = Number(el.dataset.val || 0);
   el.dataset.val = String(target);
-  if (el._raf) cancelAnimationFrame(el._raf);
-  if (start === target || prefersReducedMotion()) {
-    el.textContent = format(target);
-    return;
-  }
-  const t0 = performance.now();
-  const dur = 700;
-  const tick = (now) => {
-    const p = Math.min((now - t0) / dur, 1);
-    const ease = 1 - Math.pow(1 - p, 3); // ease-out cubic
-    el.textContent = format(Math.round(start + (target - start) * ease));
-    if (p < 1) el._raf = requestAnimationFrame(tick);
-  };
-  el._raf = requestAnimationFrame(tick);
+  el.textContent = format(target);
 }
 
 // Brief opacity/translate pulse when the whole ledger swaps.
 function pulseMain() {
-  const root = document.getElementById("pageRoot");
-  if (!root || prefersReducedMotion()) return;
-  root.classList.remove("page-swap");
-  void root.offsetWidth; // restart animation
-  root.classList.add("page-swap");
 }
 function esc(str) {
   return String(str)
@@ -250,24 +231,8 @@ function currentTheme() {
 
 function setTheme(theme) {
   if (theme === currentTheme()) return;
-  // Prefer a full-page View Transition morph where supported.
-  if (document.startViewTransition && !prefersReducedMotion()) {
-    document.startViewTransition(() => {
-      applyTheme(theme);
-      if (typeof state !== "undefined") {
-        try {
-          render();
-        } catch {}
-      }
-    });
-    return;
-  }
-  document.documentElement.classList.add("theme-switching");
   applyTheme(theme);
-  setTimeout(() =>
-    document.documentElement.classList.remove("theme-switching"),
-    400,
-  );
+  render();
   if (typeof state !== "undefined") {
     try {
       render(); // re-draw charts with the new palette
@@ -1108,23 +1073,7 @@ function renderPerfStrip() {
 
 // ── SCROLL REVEAL ─────────────────────────────────────────────────────────────
 function initReveal() {
-  const els = document.querySelectorAll(".reveal");
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add("in");
-          io.unobserve(e.target);
-        }
-      });
-    },
-    { threshold: 0.1 },
-  );
-  // Stagger the entrances so cards cascade in.
-  els.forEach((el, i) => {
-    el.style.transitionDelay = `${Math.min(i * 90, 450)}ms`;
-    io.observe(el);
-  });
+  document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -1324,6 +1273,7 @@ function renderCharts(totalIncome) {
         ],
       },
       options: {
+        animation: false,
         responsive: true,
         maintainAspectRatio: true,
         cutout: "68%",
@@ -1409,6 +1359,7 @@ function renderCharts(totalIncome) {
         ],
       },
       options: {
+        animation: false,
         indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,

@@ -156,12 +156,21 @@ body::before {
 
 /* Drifting aurora blobs — slow, GPU-composited, purely decorative */
 .aurora {
+  display: none;
   position: fixed;
   inset: -20%;
   z-index: 0;
   pointer-events: none;
   filter: blur(70px);
   transform: translateZ(0);
+}
+
+/* Keep the ledger responsive on shared and low-power devices. */
+body *:not(.modal):not(.modal-backdrop),
+body *::before,
+body *::after {
+  animation: none !important;
+  transition: none !important;
 }
 .aurora span {
   position: absolute;
@@ -997,8 +1006,8 @@ canvas {
   position: fixed;
   inset: 0;
   background: var(--overlay);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: flex;
   align-items: center;
   justify-content: center;

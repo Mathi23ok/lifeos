@@ -19,32 +19,54 @@ function life_os_start_session(): void
 
 function life_os_username(): string
 {
-    return life_os_config()['username'];
+    return (string) life_os_credentials()['username'];
 }
 
-function life_os_password(): string
+function life_os_credentials(): array
 {
-    return life_os_config()['password'];
+    $credentials = life_os_db()->query('SELECT username, password_hash FROM app_credentials WHERE credential_id = 1')->fetch();
+    if (!is_array($credentials)) {
+        throw new RuntimeException('App sign-in credentials are not initialized.');
+    }
+    return $credentials;
+}
+
+function life_os_credential_fingerprint(array $credentials): string
+{
+    return hash('sha256', $credentials['username'] . "\0" . $credentials['password_hash']);
 }
 
 function life_os_is_authenticated(): bool
 {
     life_os_start_session();
+    if (($_SESSION['life_os_authenticated'] ?? false) !== true) return false;
+
     try {
+        $credentials = life_os_credentials();
+        $fingerprint = life_os_credential_fingerprint($credentials);
+        $sessionFingerprint = (string) ($_SESSION['life_os_fingerprint'] ?? '');
+        if (hash_equals($fingerprint, $sessionFingerprint)) return true;
+
+        // Upgrade sessions created before credentials moved from config.php to MySQL.
         $config = life_os_config();
-        $fingerprint = hash('sha256', $config['username'] . "\0" . $config['password']);
-        return ($_SESSION['life_os_authenticated'] ?? false) === true
-            && hash_equals($fingerprint, (string) ($_SESSION['life_os_fingerprint'] ?? ''));
+        $legacyFingerprint = hash('sha256', $config['username'] . "\0" . $config['password']);
+        if ($credentials['username'] === $config['username']
+            && password_verify($config['password'], $credentials['password_hash'])
+            && hash_equals($legacyFingerprint, $sessionFingerprint)) {
+            $_SESSION['life_os_username'] = $credentials['username'];
+            $_SESSION['life_os_fingerprint'] = $fingerprint;
+            return true;
+        }
     } catch (Throwable) {
-        return false;
     }
+    return false;
 }
 
 function life_os_require_auth(): void
 {
     if (!life_os_is_authenticated()) {
         $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
-        if (str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') || str_contains($requestUri, '/api.php') || str_contains($requestUri, '/state.php')) {
+        if (str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json') || str_contains($requestUri, '/api.php') || str_contains($requestUri, '/state.php') || str_contains($requestUri, '/credentials.php')) {
             http_response_code(401);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Authentication required.'], JSON_UNESCAPED_UNICODE);
@@ -60,14 +82,15 @@ function life_os_require_auth(): void
 function life_os_login(string $username, string $password): bool
 {
     life_os_start_session();
-    if (!hash_equals(life_os_username(), $username) || !hash_equals(life_os_password(), $password)) {
+    $credentials = life_os_credentials();
+    if (!hash_equals((string) $credentials['username'], $username) || !password_verify($password, (string) $credentials['password_hash'])) {
         return false;
     }
 
     session_regenerate_id(true);
     $_SESSION['life_os_authenticated'] = true;
     $_SESSION['life_os_username'] = $username;
-    $_SESSION['life_os_fingerprint'] = hash('sha256', $username . "\0" . $password);
+    $_SESSION['life_os_fingerprint'] = life_os_credential_fingerprint($credentials);
     return true;
 }
 

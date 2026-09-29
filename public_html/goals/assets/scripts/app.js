@@ -323,6 +323,50 @@ function renderCategoryDatalist() {
     .join("");
 }
 
+function enableTaskDrag(list, tasks, onReorder) {
+  let from = null;
+  const clearDropMarks = () => {
+    list.querySelectorAll(".drop-before, .drop-after").forEach((row) => {
+      row.classList.remove("drop-before", "drop-after");
+    });
+  };
+  list.querySelectorAll("[data-drag-index]").forEach((handle) => {
+    handle.addEventListener("dragstart", (event) => {
+      from = Number(handle.dataset.dragIndex);
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(from));
+    });
+    handle.addEventListener("dragend", () => {
+      from = null;
+      clearDropMarks();
+    });
+  });
+  list.querySelectorAll("[data-task-index]").forEach((row) => {
+    row.addEventListener("dragover", (event) => {
+      if (from === null) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      clearDropMarks();
+      const before = event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2;
+      row.classList.add(before ? "drop-before" : "drop-after");
+    });
+    row.addEventListener("drop", (event) => {
+      if (from === null) return;
+      event.preventDefault();
+      const target = Number(row.dataset.taskIndex);
+      const before = event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2;
+      let to = target + (before ? 0 : 1);
+      if (from < to) to--;
+      clearDropMarks();
+      if (from !== to) {
+        tasks.splice(to, 0, tasks.splice(from, 1)[0]);
+        onReorder();
+      }
+      from = null;
+    });
+  });
+}
+
 function renderWizardTasks() {
   const ul = $("taskPreview");
   if (!state.wizard.draftTasks.length) {
@@ -332,7 +376,8 @@ function renderWizardTasks() {
   ul.innerHTML = state.wizard.draftTasks
     .map(
       (t, i) => `
-      <li>
+      <li data-task-index="${i}">
+        <button type="button" class="task-drag" draggable="true" data-drag-index="${i}" aria-label="Drag checklist item ${i + 1} to reorder" title="Drag to reorder">⠿</button>
         <input class="input task-edit-input" data-i="${i}" aria-label="Checklist item ${i + 1}" maxlength="150" value="${escapeHtml(t.title)}">
         <span class="task-order-actions">
           <button type="button" data-action="up" data-i="${i}" aria-label="Move item up" ${i === 0 ? "disabled" : ""}>↑</button>
@@ -349,7 +394,7 @@ function renderWizardTasks() {
       persistWizardDraft();
     });
   });
-  ul.querySelectorAll("button").forEach((b) => {
+  ul.querySelectorAll("[data-action]").forEach((b) => {
     b.addEventListener("click", () => {
       const i = Number(b.dataset.i);
       const action = b.dataset.action;
@@ -362,6 +407,10 @@ function renderWizardTasks() {
       renderWizardTasks();
       persistWizardDraft();
     });
+  });
+  enableTaskDrag(ul, state.wizard.draftTasks, () => {
+    renderWizardTasks();
+    persistWizardDraft();
   });
 }
 
@@ -550,10 +599,15 @@ function renderDetailTasks(g) {
   }
   ul.innerHTML = g.tasks
     .map(
-      (t) => `
-      <li class="task-item ${t.done ? "done" : ""}" data-id="${t.id}">
+      (t, i) => `
+      <li class="task-item ${t.done ? "done" : ""}" data-id="${t.id}" data-task-index="${i}">
+        <button type="button" class="task-drag" draggable="true" data-drag-index="${i}" aria-label="Drag checklist item ${i + 1} to reorder" title="Drag to reorder">⠿</button>
         <input type="checkbox" ${t.done ? "checked" : ""} aria-label="Mark complete">
         <span class="task-title">${escapeHtml(t.title)}</span>
+        <span class="task-order-actions">
+          <button type="button" data-move="-1" aria-label="Move checklist item ${i + 1} up" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button type="button" data-move="1" aria-label="Move checklist item ${i + 1} down" ${i === g.tasks.length - 1 ? "disabled" : ""}>↓</button>
+        </span>
         <button type="button" class="task-remove" aria-label="Remove">×</button>
       </li>
     `
@@ -579,6 +633,20 @@ function renderDetailTasks(g) {
       renderDetailProgress(g);
       render();
     });
+    li.querySelectorAll("[data-move]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const from = Number(li.dataset.taskIndex);
+        const to = from + Number(button.dataset.move);
+        if (to < 0 || to >= g.tasks.length) return;
+        [g.tasks[from], g.tasks[to]] = [g.tasks[to], g.tasks[from]];
+        save();
+        renderDetailTasks(g);
+      });
+    });
+  });
+  enableTaskDrag(ul, g.tasks, () => {
+    save();
+    renderDetailTasks(g);
   });
 }
 

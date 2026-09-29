@@ -171,7 +171,7 @@ function showToast(message) {
 
 async function loadHabits() {
   const data = await api("/api/habits");
-  state.habits = data.habits;
+  state.habits = data.habits.map((habit) => ({ ...habit, id: Number(habit.id) }));
 }
 
 async function loadLogs() {
@@ -184,7 +184,7 @@ async function loadLogs() {
 
 async function loadCategories() {
   const data = await api("/api/categories");
-  state.categories = data.categories;
+  state.categories = data.categories.map((category) => ({ ...category, id: Number(category.id) }));
 }
 
 async function loadActivity() {

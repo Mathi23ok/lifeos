@@ -673,6 +673,30 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.55; }
   padding: 0 4px;
 }
 .task-item .task-remove:hover { color: var(--danger); }
+.task-drag {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  padding: 2px 5px;
+  cursor: grab;
+  font-size: 18px;
+  line-height: 1;
+}
+.task-drag:active { cursor: grabbing; }
+.task-drag:hover, .task-drag:focus-visible { color: var(--accent); }
+.task-item .task-order-actions button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 16px;
+}
+.task-item .task-order-actions button:hover { color: var(--accent); }
+.task-item .task-order-actions button:disabled { opacity: .35; cursor: default; }
+[data-task-index].drop-before { border-top: 2px solid var(--accent); }
+[data-task-index].drop-after { border-bottom: 2px solid var(--accent); }
 
 .notes-section .textarea { width: 100%; }
 

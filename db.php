@@ -52,6 +52,17 @@ function life_os_initialize_tables(PDO $db): void
         state_value LONGTEXT NOT NULL,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+    $db->exec('CREATE TABLE IF NOT EXISTS app_credentials (
+        credential_id TINYINT UNSIGNED PRIMARY KEY,
+        username VARCHAR(190) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+    if ($db->query('SELECT 1 FROM app_credentials WHERE credential_id = 1')->fetchColumn() === false) {
+        $config = life_os_config();
+        $seedCredentials = $db->prepare('INSERT IGNORE INTO app_credentials (credential_id, username, password_hash) VALUES (1, ?, ?)');
+        $seedCredentials->execute([$config['username'], password_hash($config['password'], PASSWORD_DEFAULT)]);
+    }
     $db->exec("CREATE TABLE IF NOT EXISTS categories (
         id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(60) NOT NULL UNIQUE,

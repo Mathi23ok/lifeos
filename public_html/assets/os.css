@@ -55,3 +55,59 @@
 @media(prefers-reduced-motion:reduce){.focus-scene *{animation:none!important}}
 
 .timer-panel{align-self:start}
+
+/* Keep the full app menu usable when the app links outgrow the header. */
+@media (max-width: 1380px) {
+  .os-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 16px;
+    padding: 12px 4%;
+  }
+  .os-nav nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    justify-content: flex-start;
+    gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .os-nav nav::-webkit-scrollbar { display: none; }
+  .os-nav nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  #theme {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+@media (max-width: 760px) {
+  .os-nav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 12px 18px;
+  }
+  .os-nav nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    order: initial;
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+  .os-nav nav a {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    text-align: center;
+  }
+}

@@ -22,6 +22,11 @@ if ($relativePath === 'state.php') {
 
 life_os_require_auth();
 
+if ($relativePath === 'credentials.php') {
+    require __DIR__ . '/credentials.php';
+    return true;
+}
+
 if ($relativePath === '') {
     $relativePath = 'index.html';
 }
