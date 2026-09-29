@@ -24,7 +24,7 @@ if (!function_exists('curl_multi_init')) {
 
 // Qeshm city and a nearby sea cell east of the island. Tide values are modeled, not gauge readings.
 $urls = [
-    'weather' => 'https://api.open-meteo.com/v1/forecast?latitude=26.9492&longitude=56.2691&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTehran&forecast_days=4',
+    'weather' => 'https://api.open-meteo.com/v1/forecast?latitude=26.9492&longitude=56.2691&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTehran&forecast_days=8',
     'marine' => 'https://marine-api.open-meteo.com/v1/marine?latitude=26.94&longitude=56.35&hourly=sea_level_height_msl&current=sea_level_height_msl&timezone=Asia%2FTehran&forecast_days=2&cell_selection=sea',
 ];
 

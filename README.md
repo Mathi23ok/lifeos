@@ -18,4 +18,4 @@ To preserve an existing Habittify SQLite database, run `php migrate-sqlite.php /
 
 Run `node --test tests/timer.test.mjs` for timer checks.
 
-The Overview weather card loads Qeshm Island's current forecast and next three days through the local `weather.php` endpoint, which requests Open-Meteo over verified HTTPS. Its tide trend and next high/low are derived from Open-Meteo's nearby offshore hourly sea-level model; this is a coastal estimate above mean sea level, not navigation data. The server needs internet access and PHP cURL. The card shows an unavailable state if either feed fails.
+The Overview weather card loads Qeshm Island's current forecast and next seven days through the local `weather.php` endpoint, which requests Open-Meteo over verified HTTPS. Its tide trend and next high/low are derived from Open-Meteo's nearby offshore hourly sea-level model; this is a coastal estimate above mean sea level, not navigation data. The server needs internet access and PHP cURL. The card shows an unavailable state if either feed fails.
