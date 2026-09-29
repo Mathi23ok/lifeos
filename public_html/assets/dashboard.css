@@ -89,6 +89,42 @@
 .metric-track{display:block;width:100%;height:5px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:12px;border:1px solid var(--border)}
 .metric-track span{display:block;height:100%;width:0;background:var(--accent);border-radius:inherit;transition:width 800ms cubic-bezier(.22,1,.36,1)}
 
+/* ---------- Kish weather ---------- */
+.dash-card.kish-weather{--kish-blue:#69d9eb;position:relative;isolation:isolate;overflow:hidden;margin-bottom:16px;padding:23px 26px 16px;background:linear-gradient(112deg,color-mix(in srgb,var(--surface) 91%,#153e54),var(--surface) 62%);border-color:color-mix(in srgb,var(--kish-blue) 24%,var(--border))}
+.kish-weather-glow{position:absolute;z-index:-1;inset:0;background:radial-gradient(circle at 82% 3%,color-mix(in srgb,var(--kish-blue) 16%,transparent),transparent 37%),radial-gradient(circle at 4% 110%,color-mix(in srgb,var(--accent) 11%,transparent),transparent 40%);pointer-events:none}
+.kish-weather-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.kish-weather .card-kicker{color:var(--kish-blue);margin-bottom:6px}
+.kish-weather h2{font:400 clamp(22px,2.5vw,30px) Georgia,serif;letter-spacing:-.035em;margin:0}
+.kish-weather h2 span{font:400 17px var(--font-mono);color:var(--kish-blue);vertical-align:top}
+.kish-weather-live{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;color:var(--text-secondary);font:600 10px var(--font-mono);border:1px solid var(--border);border-radius:99px;padding:6px 10px;background:color-mix(in srgb,var(--surface) 82%,transparent)}
+.kish-weather-live i{width:6px;height:6px;border-radius:50%;background:var(--kish-blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--kish-blue) 14%,transparent)}
+.kish-weather-main{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:21px 0 23px}
+.kish-weather-now{display:flex;align-items:center;gap:18px;min-width:0}
+.kish-weather-icon{width:88px;height:88px;color:var(--kish-blue);display:grid;place-items:center;flex:none;filter:drop-shadow(0 6px 16px color-mix(in srgb,var(--kish-blue) 22%,transparent))}
+.kish-weather-icon svg{width:83px;height:83px}
+.kish-weather-icon .weather-sun{opacity:.9}.kish-weather-icon .weather-cloud{color:var(--text)}
+.kish-weather-temperature{font:500 clamp(52px,6vw,78px)/.95 var(--font-mono);letter-spacing:-.08em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kish-weather-temperature small{font-size:.35em;letter-spacing:-.02em;vertical-align:top;margin-left:5px;color:var(--kish-blue)}
+.kish-weather-now p{font-size:13px;color:var(--text-secondary);margin:9px 0 0}
+.kish-weather-details{display:grid;grid-template-columns:repeat(3,minmax(80px,1fr));gap:8px;min-width:min(42%,370px)}
+.kish-weather-details>div{padding:11px 13px;border:1px solid var(--border);border-radius:11px;background:color-mix(in srgb,var(--surface-2) 68%,transparent)}
+.kish-weather-details span,.kish-weather-label{display:block;font:700 9px var(--font-mono);letter-spacing:.11em;color:var(--text-tertiary)}
+.kish-weather-details strong{display:block;font:600 15px var(--font-mono);margin-top:8px;white-space:nowrap}
+.kish-weather-bottom{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:24px;padding:17px 0 15px;border-top:1px solid var(--border);align-items:center}
+.kish-weather-tide{display:flex;align-items:center;gap:14px;min-width:0}
+.kish-tide-icon{width:45px;height:45px;display:grid;place-items:center;flex:none;border-radius:12px;background:color-mix(in srgb,var(--kish-blue) 14%,transparent);color:var(--kish-blue);font:400 33px/1 Georgia,serif}
+.kish-weather-tide strong{display:block;font:600 15px var(--font-mono);margin:5px 0 3px}
+.kish-weather-tide small{display:block;color:var(--text-secondary);font-size:11px;line-height:1.5}
+.kish-weather-forecast{min-width:0}
+.kish-forecast-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:7px}
+.kish-forecast-day{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:8px 10px;background:color-mix(in srgb,var(--surface-2) 68%,transparent);border:1px solid var(--border);border-radius:10px;min-width:0}
+.kish-forecast-day>span{font:700 11px var(--font-mono);color:var(--text-secondary)}
+.kish-forecast-day svg{width:29px;height:29px;color:var(--kish-blue)}
+.kish-forecast-day strong{font:600 12px var(--font-mono);white-space:nowrap}.kish-forecast-day small{font-size:10px;color:var(--text-tertiary)}
+.kish-weather-footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:7px 18px;padding-top:12px;border-top:1px solid var(--border);color:var(--text-tertiary);font-size:10px;line-height:1.5}
+.kish-weather-footer a{color:var(--text-secondary);text-underline-offset:2px}
+[data-theme="light"] .dash-card.kish-weather{--kish-blue:#167d99;background:linear-gradient(112deg,#edf9fb,var(--surface) 64%)}
+
 /* ---------- charts ---------- */
 .dash-row{display:grid;grid-template-columns:1.55fr 1fr;gap:16px;margin-bottom:16px}
 .dash-card{border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-card);padding:20px 22px;min-width:0}
@@ -243,6 +279,9 @@
   .score-head{text-align:center}
   .score-head p{margin-inline:auto}
   .score-grade,.score-delta{justify-content:center}
+  .kish-weather-main{align-items:flex-start;flex-direction:column}
+  .kish-weather-details{min-width:0;width:100%}
+  .kish-weather-bottom{grid-template-columns:1fr}
 }
 @media(max-width:650px){
   .dashboard{padding:22px 16px 52px}
@@ -260,6 +299,16 @@
   .card-head{gap:10px}
   .card-extra{max-width:38%;white-space:normal}
   .heat-cells{gap:3px}
+  .dash-card.kish-weather{padding:19px 18px 14px}
+  .kish-weather-main{gap:17px;padding:18px 0}
+  .kish-weather-icon{width:66px;height:66px}
+  .kish-weather-icon svg{width:64px;height:64px}
+  .kish-weather-now{gap:11px}
+  .kish-weather-details{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .kish-weather-details>div{padding:9px}
+  .kish-weather-details strong{font-size:12px}
+  .kish-forecast-day{padding:7px 8px;flex-wrap:wrap;justify-content:center;text-align:center}
+  .kish-forecast-day>span{width:100%}
 }
 @media(max-width:420px){
   .dash-metrics{grid-template-columns:1fr}

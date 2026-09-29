@@ -1,3 +1,5 @@
+import { refreshWeatherCard } from './weather.js';
+
 const readJson = (key) => {
   try { return JSON.parse(appStorage.getItem(key) || 'null'); } catch { return null; }
 };
@@ -103,6 +105,17 @@ export function mountDashboard() {
       <a href="#kanban" class="dash-metric"><div class="metric-top"><span class="metric-symbol symbol-work" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="5" height="16" rx="1"/><rect x="9.5" y="4" width="5" height="11" rx="1"/><rect x="16" y="4" width="5" height="7" rx="1"/></svg></span><span class="metric-delta flat" id="task-delta">—</span></div><span class="metric-label">Cards in flight</span><span class="metric-value-row"><strong class="metric-value" id="m-tasks">0</strong><span class="metric-unit">moving</span></span><span class="metric-foot" id="m-tasks-foot"></span><span class="metric-track"><span id="m-tasks-track"></span></span></a>
     </section>
 
+    <section class="kish-weather dash-card" id="kish-weather" aria-labelledby="kish-weather-title" aria-busy="true">
+      <div class="kish-weather-glow" aria-hidden="true"></div>
+      <div class="kish-weather-header"><div><span class="card-kicker">ISLAND CONDITIONS · STRAIT OF HORMUZ</span><h2 id="kish-weather-title">Qeshm Island <span>↗</span></h2></div><span class="kish-weather-live" id="kish-weather-status"><i></i> Loading forecast</span></div>
+      <div class="kish-weather-main">
+        <div class="kish-weather-now"><div class="kish-weather-icon" id="kish-weather-icon" aria-hidden="true"></div><div><div class="kish-weather-temperature" id="kish-weather-temperature">—<small>°C</small></div><p id="kish-weather-condition">Fetching current conditions…</p></div></div>
+        <div class="kish-weather-details"><div><span>FEELS LIKE</span><strong id="kish-weather-feels">—</strong></div><div><span>WIND</span><strong id="kish-weather-wind">—</strong></div><div><span>HUMIDITY</span><strong id="kish-weather-humidity">—</strong></div></div>
+      </div>
+      <div class="kish-weather-bottom"><div class="kish-weather-tide"><div class="kish-tide-icon" aria-hidden="true">≈</div><div><span class="kish-weather-label">SEA LEVEL · MODELED TIDE</span><strong id="kish-tide-state">Loading sea conditions…</strong><small id="kish-tide-detail">Near Qeshm · above mean sea level</small></div></div><div class="kish-weather-forecast" id="kish-weather-forecast" aria-label="Next three days forecast"><span class="kish-weather-label">NEXT 3 DAYS</span><div class="kish-forecast-days"><span>Loading forecast…</span></div></div></div>
+      <div class="kish-weather-footer"><span id="kish-weather-updated">Qeshm local time · Asia/Tehran</span><span>Coastal tide estimate; not for navigation · <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> / <a href="https://open-meteo.com/en/docs/marine-weather-api" target="_blank" rel="noopener noreferrer">DWD</a></span></div>
+    </section>
+
     <section class="dash-row" aria-label="Focus and habit charts">
       <article class="dash-card"><div class="card-head"><div><span class="card-kicker">FOCUS · LAST 14 DAYS</span><h3 class="card-title">Deep-work minutes</h3></div><div class="card-extra"><strong id="focus-14-total">0</strong>min total</div></div><div id="focus-chart" class="rise"></div></article>
       <article class="dash-card"><div class="card-head"><div><span class="card-kicker">HABITS · LAST 14 DAYS</span><h3 class="card-title">Completion rate</h3></div><div class="card-extra"><strong id="habit-14-avg">0%</strong>avg daily</div></div><div id="habit-chart" class="rise"></div></article>
@@ -141,6 +154,7 @@ let lastScore = 0;
 
 export async function refreshDashboard() {
   const sequence = ++refreshSequence;
+  refreshWeatherCard();
   const today = tehranKeyNow();
   const hour = tehranHour();
   const greeting = hour < 6 ? 'Working late' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Winding down';
