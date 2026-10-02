@@ -22,6 +22,11 @@ if ($relativePath === 'state.php') {
 
 life_os_require_auth();
 
+if ($relativePath === 'attachments.php') {
+    require __DIR__ . '/attachments.php';
+    return true;
+}
+
 if ($relativePath === 'weather.php') {
     require __DIR__ . '/weather.php';
     return true;

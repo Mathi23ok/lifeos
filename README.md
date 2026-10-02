@@ -19,3 +19,7 @@ To preserve an existing Habittify SQLite database, run `php migrate-sqlite.php /
 Run `node --test tests/timer.test.mjs` for timer checks.
 
 The Overview weather card loads Qeshm Island's current forecast and next seven days through the local `weather.php` endpoint, which requests Open-Meteo over verified HTTPS. Its tide trend and next high/low are derived from Open-Meteo's nearby offshore hourly sea-level model; this is a coastal estimate above mean sea level, not navigation data. The server needs internet access and PHP cURL. The card shows an unavailable state if either feed fails.
+
+## Calendar
+
+Open Calendar (`#calendar`) for due cards from every Kanban board. Month places cards on their saved due dates; Schedule lists all dated cards across months. Board filters, search, an overdue list, and an optional completed-card filter help narrow the view. Completed cards are included by default. Cards without a valid due date are counted separately. Dates and overdue status use Asia/Tehran, and selecting an event opens its original Kanban card editor. Board changes update the calendar through the existing shared state channel; Refresh reloads the latest MySQL state.

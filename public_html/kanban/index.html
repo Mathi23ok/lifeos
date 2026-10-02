@@ -23,7 +23,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="assets/styles/style.css" />
+    <link rel="stylesheet" href="assets/styles/style.css?v=trello-9" />
   </head>
   <body>
     <div class="aurora" aria-hidden="true">
@@ -31,11 +31,18 @@
     </div>
 
     <div class="app-container">
-      <nav class="board-tabs" id="boardTabs" aria-label="Board navigation">
+      <header class="board-toolbar">
+        <h1 id="boardHeading"></h1>
+        <nav class="board-tabs" id="boardTabs" aria-label="Board navigation">
         <!-- Board tabs rendered by JS -->
-      </nav>
+        </nav>
+      </header>
 
       <main class="board-main" id="boardMain">
+        <header class="board-overview">
+          <p id="boardDescription" hidden></p>
+          <span class="board-summary" id="boardSummary"></span>
+        </header>
         <div class="columns-container" id="columnsContainer">
           <!-- Columns rendered by JS -->
         </div>
@@ -68,6 +75,21 @@
             required
           />
         </label>
+        <label class="field">
+          <span>Description</span>
+          <textarea class="input textarea" id="boardDescriptionInput" maxlength="500" rows="3" placeholder="What is this board for?"></textarea>
+        </label>
+        <fieldset class="background-field">
+          <legend>Board background</legend>
+          <div class="background-options">
+            <label class="background-choice" data-background="default"><input type="radio" name="boardBackground" value="default" checked /><span>Classic</span></label>
+            <label class="background-choice" data-background="mint"><input type="radio" name="boardBackground" value="mint" /><span>Mint</span></label>
+            <label class="background-choice" data-background="ocean"><input type="radio" name="boardBackground" value="ocean" /><span>Ocean</span></label>
+            <label class="background-choice" data-background="sunset"><input type="radio" name="boardBackground" value="sunset" /><span>Sunset</span></label>
+            <label class="background-choice" data-background="violet"><input type="radio" name="boardBackground" value="violet" /><span>Violet</span></label>
+            <label class="background-choice" data-background="slate"><input type="radio" name="boardBackground" value="slate" /><span>Slate</span></label>
+          </div>
+        </fieldset>
         <div class="modal-actions">
           <button
             type="button"
@@ -82,80 +104,94 @@
       </form>
     </dialog>
 
-    <!-- Card Detail / Edit Modal -->
-    <dialog class="card-modal" id="cardModal">
+    <!-- Card details: reference layout -->
+    <dialog class="card-modal trello-card" id="cardModal" aria-labelledby="cardModalTitle">
       <form class="card-form" id="cardForm" method="dialog">
-        <div class="modal-header">
-          <h3 id="cardModalTitle">Card</h3>
-          <button
-            type="button"
-            class="icon-btn modal-close"
-            id="closeCardModal"
-            title="Close"
-          >
-            ×
-          </button>
-        </div>
-        <input type="hidden" id="cardBoardId" />
-        <input type="hidden" id="cardColumnId" />
-        <input type="hidden" id="cardId" />
-        <label class="field">
-          <span>Title</span>
-          <input
-            class="input"
-            id="cardTitle"
-            maxlength="120"
-            placeholder="What needs doing?"
-            required
-          />
-        </label>
-        <label class="field">
-          <span>Description</span>
-          <textarea
-            class="input textarea"
-            id="cardDescription"
-            rows="4"
-            maxlength="2000"
-            placeholder="Add details, links, acceptance criteria…"
-          ></textarea>
-        </label>
-        <div class="card-form-row">
-          <label class="field">
-            <span>Priority</span>
-            <select class="input" id="cardPriority">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label class="field"><span>Due date</span><input class="input" id="cardDueDate" type="date" /></label>
-        </div>
-        <section class="card-detail-section" aria-labelledby="labelsHeading">
-          <div class="detail-heading"><h4 id="labelsHeading">Labels</h4><span>Choose or manage board labels</span></div>
-          <div id="cardLabelOptions" class="label-options"></div>
-          <div class="label-editor">
-            <input class="input" id="newLabelName" maxlength="30" placeholder="New label name" aria-label="New label name" />
-            <input id="newLabelColor" type="color" value="#2563eb" aria-label="New label color" />
-            <button class="btn-ghost" id="addLabelBtn" type="button">Add label</button>
+        <input type="hidden" id="cardBoardId" /><input type="hidden" id="cardColumnId" /><input type="hidden" id="cardId" />
+        <h2 id="cardModalTitle" class="visually-hidden">Card details</h2>
+        <header class="trello-topbar">
+          <select id="cardList" aria-label="Card list"></select>
+          <div class="trello-top-actions">
+            <button type="button" data-editor-target="cardAttachmentsSection" aria-label="Card attachments"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><path d="m5 18 5-6 3 3 3-4 3 7"/></svg></button>
+            <details class="editor-more"><summary aria-label="More card actions">⋯</summary><div><button type="button" id="deleteCardBtn" class="menu-danger">Delete card</button></div></details>
+            <button type="button" id="closeCardModal" aria-label="Close card"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
           </div>
-        </section>
-        <section class="card-detail-section" aria-labelledby="checklistHeading">
-          <div class="detail-heading"><h4 id="checklistHeading">Checklist</h4><span id="checklistProgress"></span></div>
-          <div id="cardChecklist" class="checklist-items"></div>
-          <div class="checklist-add"><input class="input" id="newChecklistItem" maxlength="120" placeholder="Add an item" aria-label="New checklist item" /><button class="btn-ghost" id="addChecklistItemBtn" type="button">Add</button></div>
-        </section>
-        <p class="card-form-error" id="cardFormError" role="alert" hidden></p>
-        <div class="modal-actions">
-          <button type="button" class="btn-ghost btn-danger" id="deleteCardBtn">
-            Delete
-          </button>
-          <span class="card-form-meta" id="cardFormMeta"></span>
-          <button type="submit" class="btn-primary">Save</button>
+        </header>
+        <div class="trello-body">
+          <div class="trello-details">
+            <div class="trello-title-row"><input type="checkbox" id="cardCompleted" aria-label="Mark card complete" /><textarea id="cardTitle" rows="2" maxlength="120" required aria-label="Card title" dir="auto" placeholder="Card title"></textarea></div>
+            <div class="trello-action-row">
+              <button type="button" id="cardAddBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cardAddMenu"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+              <button type="button" id="cardDatesBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cardDatesMenu"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Dates</button>
+              <button type="button" id="cardChecklistBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="cardChecklistMenu"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg>Checklist</button>
+              <button type="button" data-editor-target="cardMembersSection"><svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 20v-3a6 6 0 0 1 12 0M19 11v8M15 15h8"/></svg>Members</button>
+              <button type="button" data-editor-target="cardAttachmentsSection"><svg viewBox="0 0 24 24"><path d="m9 14 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M7 16l9-9"/></svg>Attachment</button>
+            </div>
+            <div id="cardExtra" class="trello-inline-panel" hidden><h4>Custom fields</h4><label class="field"><span>Priority</span><select class="input" id="cardPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label><div id="cardCustomFields"></div><button type="button" class="btn-ghost" id="addCustomFieldBtn">+ Add field</button></div>
+            <div id="cardDates" class="trello-date-summary" hidden><span>Dates</span><button type="button" id="cardDateSummary"></button></div><input id="cardDueDate" type="hidden" />
+            <div id="cardMembersSection" class="trello-inline-panel" hidden><label class="field"><span>Members</span><input class="input" id="cardMembers" maxlength="240" placeholder="Names, separated by commas" /></label></div>
+            <section id="cardAttachmentsSection" class="trello-file-section" hidden><div class="trello-section-heading"><svg viewBox="0 0 24 24"><path d="m9 14 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M7 16l9-9"/></svg><h4>Attachments</h4></div><div id="cardFileAttachments"></div><label class="field legacy-attachment-link" id="legacyAttachmentField" hidden><span>Attachment link</span><input class="input" id="cardAttachmentUrl" type="url" placeholder="https://…" /></label></section>
+            <section class="trello-labels" aria-labelledby="labelsHeading">
+              <h4 id="labelsHeading">Labels</h4>
+              <div class="trello-label-chips"><div id="cardSelectedLabels"></div><button type="button" data-editor-target="cardLabelsEditor" aria-label="Edit labels">+</button></div>
+              <div id="cardLabelsEditor" hidden><div id="cardLabelOptions" class="label-options"></div><div class="label-editor"><input class="input" id="newLabelName" maxlength="30" placeholder="New label name" aria-label="New label name" /><input id="newLabelColor" type="color" value="#2563eb" aria-label="New label color" /><button class="btn-ghost" id="addLabelBtn" type="button">Add label</button></div></div>
+            </section>
+            <section class="trello-description">
+              <div class="trello-section-heading"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><h4>Description</h4><button type="button" id="editDescriptionBtn">Edit</button></div>
+              <div id="cardDescriptionPreview" dir="auto"></div>
+              <textarea class="input textarea" id="cardDescription" rows="6" maxlength="2000" dir="auto" aria-label="Description" placeholder="Add a more detailed description…" hidden></textarea>
+            </section>
+            <section id="cardChecklistSection" class="trello-checklist" aria-label="Card checklists" hidden><div id="cardChecklist"></div></section>
+            <p class="card-form-error" id="cardFormError" role="alert" hidden></p>
+            <div class="trello-save-row"><span id="cardFormMeta" class="card-form-meta"></span><button type="submit" class="btn-primary">Save changes</button></div>
+          </div>
+          <aside class="trello-activity" aria-labelledby="activityHeading">
+            <div class="trello-activity-heading"><svg viewBox="0 0 24 24"><path d="M4 4h16v13H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg><h4 id="activityHeading">Comments and activity</h4><button type="button" id="toggleActivityDetails" aria-expanded="false">Show details</button></div>
+            <textarea id="cardComment" rows="1" maxlength="2000" placeholder="Write a comment…" aria-label="Write a comment" dir="auto"></textarea>
+            <button type="button" id="saveCommentBtn" class="btn-primary" hidden>Save comment</button>
+            <div id="cardComments" class="trello-comments"></div>
+            <div id="cardActivityDetails" hidden></div>
+          </aside>
+        </div>
+        <div id="cardAddMenu" class="card-add-menu" popover="auto" role="dialog" aria-labelledby="cardAddMenuTitle">
+          <header><h3 id="cardAddMenuTitle">Add to card</h3><button type="button" id="closeCardAddMenu" aria-label="Close Add to card"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+          <button type="button" data-add-target="cardLabelsEditor"><span class="add-item-icon"><svg viewBox="0 0 24 24"><path d="M20 4h-7L3 14l7 7L20 11V4Z"/><circle cx="16" cy="8" r="1"/></svg></span><span><strong>Labels</strong><small>Organize, categorize, and prioritize</small></span></button>
+          <button type="button" data-add-target="cardDates"><span class="add-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><strong>Dates</strong><small>Start dates, due dates, and reminders</small></span></button>
+          <button type="button" data-add-target="cardChecklistSection"><span class="add-item-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg></span><span><strong>Checklist</strong><small>Add subtasks</small></span></button>
+          <button type="button" data-add-target="cardMembersSection"><span class="add-item-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M5 21v-3a7 7 0 0 1 14 0v3"/></svg></span><span><strong>Members</strong><small>Assign members</small></span></button>
+          <button type="button" data-add-target="cardAttachmentsSection"><span class="add-item-icon"><svg viewBox="0 0 24 24"><path d="m9 14 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M7 16l9-9"/></svg></span><span><strong>Attachment</strong><small>Add links, files, and documents</small></span></button>
+          <button type="button" data-add-target="cardExtra"><span class="add-item-icon"><svg viewBox="0 0 24 24"><path d="M3 5h12"/><rect x="3" y="10" width="18" height="9" rx="2"/></svg></span><span><strong>Custom Fields</strong><small>Create your own fields</small></span></button>
+        </div>
+        <div id="cardDatesMenu" class="card-dates-menu" popover="auto" role="dialog" aria-labelledby="cardDatesMenuTitle">
+          <header><h3 id="cardDatesMenuTitle">Dates</h3><button type="button" id="closeCardDatesMenu" aria-label="Close Dates"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+          <div class="date-calendar-nav"><button type="button" data-calendar-shift="-12" aria-label="Previous year">«</button><button type="button" data-calendar-shift="-1" aria-label="Previous month">‹</button><h4 id="dateCalendarMonth" aria-live="polite"></h4><button type="button" data-calendar-shift="1" aria-label="Next month">›</button><button type="button" data-calendar-shift="12" aria-label="Next year">»</button></div>
+          <div class="date-calendar-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+          <div id="dateCalendarDays" class="date-calendar-days" role="group" aria-label="Choose a date"></div>
+          <div class="date-picker-fields">
+            <label for="datePickerStart">Start date</label><div class="date-picker-row"><input id="dateStartEnabled" type="checkbox" aria-label="Enable start date" /><input id="datePickerStart" type="date" disabled /></div>
+            <label for="datePickerDue">Due date</label><div class="date-picker-row due-row"><input id="dateDueEnabled" type="checkbox" aria-label="Enable due date" /><input id="datePickerDue" type="date" /><input id="datePickerTime" type="time" aria-label="Due time" /></div>
+            <label for="datePickerRecurring">Recurring</label><select id="datePickerRecurring"><option value="never">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
+            <label for="datePickerReminder">Set due date reminder</label><select id="datePickerReminder"><option value="none">None</option><option value="0">At due time</option><option value="5">5 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select>
+            <p class="date-picker-help">Reminders appear in Life OS while the Kanban board is open. Recurring cards move to the next date when marked complete.</p>
+            <p id="datePickerError" role="alert" hidden></p>
+            <button type="button" id="saveCardDatesBtn" class="date-picker-save">Save</button><button type="button" id="removeCardDatesBtn" class="date-picker-remove">Remove</button>
+          </div>
+        </div>
+        <div id="cardChecklistMenu" class="card-checklist-menu" popover="auto" role="dialog" aria-labelledby="cardChecklistMenuTitle">
+          <header><h3 id="cardChecklistMenuTitle">Add checklist</h3><button type="button" id="closeCardChecklistMenu" aria-label="Close Add checklist"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+          <label class="field"><span>Title</span><input id="newChecklistTitle" class="input" maxlength="60" value="Checklist" autocomplete="off" /></label>
+          <p id="checklistTitleError" role="alert" hidden></p>
+          <button type="button" id="createChecklistBtn" class="date-picker-save">Add</button>
+        </div>
+        <div id="cardAttachMenu" class="card-attach-menu" popover="auto" role="dialog" aria-labelledby="cardAttachMenuTitle">
+          <header><h3 id="cardAttachMenuTitle">Attach</h3><button type="button" id="closeCardAttachMenu" aria-label="Close Attach"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+          <div id="attachmentDropZone" class="attachment-drop-zone"><h4>Attach a file from your computer</h4><p>You can also drag and drop files to upload them.</p><label class="attachment-choose-file" for="uploadCardFiles">Choose a file</label><input type="file" id="uploadCardFiles" multiple class="visually-hidden" /><small id="attachmentSizeLimit">Up to 8 MB per file</small></div>
+          <progress id="attachmentUploadProgress" max="100" value="0" aria-label="File upload progress" hidden></progress><p id="attachmentUploadStatus" role="status" aria-live="polite"></p>
         </div>
       </form>
     </dialog>
 
     <div class="toast" id="toast"></div>
-    <script src="assets/scripts/app.js" defer></script>
+    <script src="assets/scripts/app.js?v=trello-9" defer></script>
   </body>
 </html>
