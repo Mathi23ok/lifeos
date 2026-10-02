@@ -725,7 +725,7 @@ function openAddExpenseModal() {
       <button class="btn-primary" onclick="saveNewExpense()">${esc("Log Expense")}</button>
     </div>
   `);
-  setTimeout(() => document.getElementById("expenseCategory")?.focus(), 0);
+  setTimeout(() => document.getElementById("expenseCategory-trigger")?.focus(), 0);
 }
 
 function saveNewExpense() {
@@ -969,6 +969,127 @@ function openModal(html, wide) {
   overlay.innerHTML = `<div class="modal-box${wide ? " wide" : ""}" onclick="event.stopPropagation()">${html}</div>`;
   overlay.onclick = closeModal;
   document.body.appendChild(overlay);
+  overlay.querySelectorAll('#expenseCategory, #editExpenseCategory').forEach(enhanceCategorySelect);
+}
+
+// Keep the original select as the source of truth for existing save handlers.
+function enhanceCategorySelect(select) {
+  const fa = document.documentElement.lang === 'fa';
+  const words = fa
+    ? { label: 'دسته‌بندی', placeholder: 'انتخاب دسته‌بندی', search: 'جستجوی دسته‌بندی…', empty: 'دسته‌بندی پیدا نشد', remaining: 'باقی‌مانده', noBudget: 'بدون بودجه', count: 'دسته‌بندی' }
+    : { label: 'Category', placeholder: 'Choose a category', search: 'Search categories…', empty: 'No categories found', remaining: 'remaining', noBudget: 'No budget set', count: 'categories' };
+  const wrapper = document.createElement('div');
+  wrapper.className = 'category-picker mb-3';
+  wrapper.innerHTML = `<button type="button" class="category-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="${words.label}"><span class="category-selected"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div class="category-popover" hidden><div class="category-search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input type="text" role="combobox" aria-label="${words.search}" placeholder="${words.search}" aria-autocomplete="list" aria-expanded="false" autocomplete="off"></div><div class="category-options" role="listbox" aria-label="${words.label}"></div><div class="category-count"></div></div>`;
+  select.after(wrapper);
+  select.hidden = true;
+  const trigger = wrapper.querySelector('.category-trigger');
+  const panel = wrapper.querySelector('.category-popover');
+  const input = wrapper.querySelector('input');
+  const list = wrapper.querySelector('.category-options');
+  list.id = select.id + '-options';
+  input.setAttribute('aria-controls', list.id);
+  trigger.setAttribute('aria-controls', list.id);
+  const label = document.querySelector(`label[for="${select.id}"]`);
+  trigger.id = select.id + '-trigger';
+  if (label) label.htmlFor = trigger.id;
+  let active = -1;
+  let filtered = [];
+  const normalize = text => text.normalize('NFKC').toLocaleLowerCase().replace(/ي/g, 'ی').replace(/ك/g, 'ک').trim();
+  function updateLabel() {
+    wrapper.querySelector('.category-selected').textContent = select.value ? select.selectedOptions[0]?.textContent || words.placeholder : words.placeholder;
+    trigger.classList.toggle('is-placeholder', !select.value);
+  }
+  function highlight() {
+    const options = [...list.querySelectorAll('[role="option"]')];
+    options.forEach((option, index) => option.classList.toggle('is-active', index === active));
+    if (options[active]) {
+      input.setAttribute('aria-activedescendant', options[active].id);
+      options[active].scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  }
+  function draw() {
+    filtered = state.categories.filter(category => normalize(category.label).includes(normalize(input.value)));
+    list.replaceChildren();
+    filtered.forEach((category, index) => {
+      const parts = splitCategoryLabel(category.label);
+      const spent = state.expenses.filter(expense => expense.categoryId === category.id).reduce((total, expense) => total + expense.amount, 0);
+      const option = document.createElement('div');
+      option.className = 'category-option';
+      option.id = list.id + '-' + index;
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(select.value === category.id));
+      const icon = document.createElement('span');
+      icon.className = 'category-icon';
+      icon.textContent = parts.emoji || '◇';
+      const copy = document.createElement('span');
+      copy.className = 'category-option-copy';
+      const name = document.createElement('strong');
+      name.textContent = parts.name;
+      const detail = document.createElement('small');
+      detail.textContent = category.target > 0 ? `${fmt(category.target - spent)} ${fa ? 'تومان' : 'Toman'} · ${words.remaining}` : words.noBudget;
+      detail.classList.toggle('is-over', category.target > 0 && spent > category.target);
+      copy.append(name, detail);
+      const check = document.createElement('span');
+      check.className = 'category-check';
+      check.textContent = select.value === category.id ? '✓' : '';
+      option.append(icon, copy, check);
+      option.addEventListener('mousedown', event => event.preventDefault());
+      option.addEventListener('click', () => choose(category));
+      list.append(option);
+    });
+    if (!filtered.length) {
+      const empty = document.createElement('div');
+      empty.className = 'category-empty';
+      empty.textContent = words.empty;
+      list.append(empty);
+    }
+    wrapper.querySelector('.category-count').textContent = `${filtered.length} ${words.count}`;
+    active = filtered.findIndex(category => category.id === select.value);
+    highlight();
+  }
+  function close(returnFocus = false) {
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-expanded', 'false');
+    if (returnFocus) trigger.focus();
+  }
+  function choose(category) {
+    select.value = category.id;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    updateLabel();
+    close(true);
+  }
+  trigger.addEventListener('click', () => {
+    if (!panel.hidden) return close();
+    input.value = '';
+    panel.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    input.setAttribute('aria-expanded', 'true');
+    draw();
+    input.focus();
+  });
+  input.addEventListener('input', draw);
+  wrapper.addEventListener('keydown', event => {
+    if (panel.hidden) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); }
+    if (event.key === 'Tab') close();
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      active = filtered.length ? (active + (event.key === 'ArrowDown' ? 1 : -1) + filtered.length) % filtered.length : -1;
+      highlight();
+    }
+    if (event.key === 'Enter' && event.target === input) {
+      event.preventDefault();
+      if (filtered[active]) choose(filtered[active]);
+      else if (filtered.length === 1) choose(filtered[0]);
+    }
+  });
+  wrapper.addEventListener('focusout', event => { if (!wrapper.contains(event.relatedTarget)) close(); });
+  document.getElementById('modalOverlay').addEventListener('mousedown', event => {
+    if (!wrapper.contains(event.target)) close();
+  });
+  updateLabel();
 }
 
 function closeModal() {

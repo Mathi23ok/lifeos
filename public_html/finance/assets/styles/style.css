@@ -388,6 +388,30 @@ html[lang="fa"] select {
 }
 
 /* ── Inputs styled like ledger entry lines ── */
+.category-picker{position:relative;width:100%}
+.category-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:13px 16px;background:var(--ink-soft);border:1px solid var(--ink-line);border-radius:8px;color:var(--text);font-size:14px;font-weight:500;text-align:start}
+.category-trigger:hover,.category-trigger[aria-expanded="true"]{border-color:var(--jade);background:var(--ink-card)}
+.category-trigger[aria-expanded="true"]{box-shadow:0 0 0 3px var(--jade-ring)}
+.category-trigger.is-placeholder{color:var(--muted)}
+.category-trigger svg{flex-shrink:0;color:var(--muted)}
+.category-popover{position:absolute;inset-inline:0;top:calc(100% + 8px);z-index:10;border:1px solid var(--line-strong);border-radius:12px;background:var(--ink-card);box-shadow:var(--shadow-modal);overflow:hidden}
+.category-popover[hidden]{display:none}
+.category-search{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--ink-line);color:var(--jade)}
+.category-search input{padding:8px 4px!important;border:0;background:transparent;box-shadow:none!important;font-size:13px}
+.category-search input:focus{background:transparent;outline:none}
+.category-options{max-height:230px;overflow-y:auto;padding:6px;overscroll-behavior:contain}
+.category-option{display:flex;align-items:center;gap:12px;padding:10px;border-radius:7px;cursor:pointer}
+.category-option:hover,.category-option.is-active{background:var(--ink-soft)}
+.category-option[aria-selected="true"]{background:var(--jade-ring)}
+.category-icon{display:grid;place-items:center;flex:0 0 36px;height:36px;border:1px solid var(--ink-line);border-radius:9px;background:var(--ink-soft);font-size:18px;color:var(--jade)}
+.category-option-copy{display:grid;gap:4px;min-width:0;flex:1}
+.category-option-copy strong{font-size:13px;font-weight:600;overflow-wrap:anywhere;color:var(--text)}
+.category-option-copy small{font-size:11px;color:var(--muted)}
+.category-option-copy small.is-over{color:var(--rust)}
+.category-check{color:var(--jade);font-size:16px}
+.category-count{padding:8px 16px;border-top:1px solid var(--ink-line);color:var(--muted-2);font-size:11px}
+.category-empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px}
+
 input,
 select,
 textarea {
