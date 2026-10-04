@@ -812,7 +812,7 @@ function renderBoardContent() {
         </div>
         ${card.description ? `<p class="card-desc">${escapeHtml(card.description)}</p>` : ''}
         ${labelsHtml ? `<div class="card-meta"><div class="card-labels">${labelsHtml}</div></div>` : ''}
-        ${(dueDate || checklist.length) ? `<div class="card-details-meta">${dueDate ? `<span class="due-badge ${dueClass}" title="Due date">◷ ${escapeHtml(dueDate)}</span>` : ''}${checklist.length ? `<span class="checklist-badge" title="Checklist progress">☑ ${completed}/${checklist.length}</span>` : ''}</div>` : ''}
+        ${(dueDate || checklist.length) ? `<div class="card-details-meta">${dueDate ? `<span class="due-badge ${dueClass}" title="Due ${escapeHtml(dueDate)}">◷ ${escapeHtml(formatCardDueDate(dueDate))}</span>` : ''}${checklist.length ? `<span class="checklist-badge" title="Checklist progress">☑ ${completed}/${checklist.length}</span>` : ''}</div>` : ''}
       `;
 
       // Remove card
@@ -1570,6 +1570,11 @@ function cardDateString(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function formatCardDueDate(value) {
+  const date = parseCardDate(value);
+  return date ? date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : value;
+}
+
 function parseCardDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
   const [year, month, day] = value.split('-').map(Number);
@@ -1584,7 +1589,7 @@ function currentModalCard() {
 
 function updateCardDateSummary(card) {
   $('cardDates').hidden = !card.startDate && !card.dueDate;
-  $('cardDateSummary').textContent = [card.startDate ? `Start ${card.startDate}` : '', card.dueDate ? `Due ${card.dueDate}${card.dueTime ? ' · ' + card.dueTime : ''}` : ''].filter(Boolean).join(' → ');
+  $('cardDateSummary').textContent = [card.startDate ? `Start ${formatCardDueDate(card.startDate)}` : '', card.dueDate ? `Due ${formatCardDueDate(card.dueDate)}${card.dueTime ? ' · ' + card.dueTime : ''}` : ''].filter(Boolean).join(' → ');
 }
 
 function openCardDates() {
