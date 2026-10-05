@@ -4,7 +4,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 
 const KEY = "edi_goals_v1";
 const DRAFTS_KEY = "edi_goals_drafts_v1";
-const WIZARD_FIELDS = ["gTitle", "gSpecific", "gCategory", "gMetric", "gTarget", "gUnit",
+const WIZARD_FIELDS = ["gTitle", "gSpecific", "gCategory",
   "gRelevant", "gPriority", "gDeadline", "gStart"];
 const SMART_STEPS = ["specific", "measurable", "achievable", "relevant", "timebound"];
 const STEP_LABELS = {
@@ -35,7 +35,7 @@ function load() {
     const raw = appStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.goals)) state.goals = parsed.goals;
+      if (Array.isArray(parsed.goals)) state.goals = parsed.goals.map(goal => ({...goal, measures: goalMeasures(goal)}));
     }
     const drafts = appStorage.getItem(DRAFTS_KEY);
     if (drafts) {
@@ -62,6 +62,67 @@ function save() {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function uid() {
   return crypto.randomUUID();
+}
+
+function goalMeasures(goal) {
+  if (Array.isArray(goal.measures)) return goal.measures;
+  return goal.metric || goal.target != null || goal.unit
+    ? [{id: uid(), metric: goal.metric || '', target: goal.target ?? null, unit: goal.unit || '', current: null}]
+    : [];
+}
+
+function readWizardMeasures() {
+  return [...$('wizardMeasures').querySelectorAll('.measure-editor')].map(row => ({
+    id: row.dataset.id,
+    metric: row.querySelector('[data-measure="metric"]').value.trim(),
+    target: row.querySelector('[data-measure="target"]').value === '' ? null : Number(row.querySelector('[data-measure="target"]').value),
+    unit: row.querySelector('[data-measure="unit"]').value.trim(),
+    current: row.querySelector('[data-measure="current"]').value === '' ? null : Number(row.querySelector('[data-measure="current"]').value),
+  }));
+}
+
+function renderWizardMeasures() {
+  const container = $('wizardMeasures');
+  container.replaceChildren();
+  state.wizard.measures.forEach((measure, index) => {
+    const row = document.createElement('div');
+    row.className = 'measure-editor';
+    row.dataset.id = measure.id || uid();
+    row.innerHTML = `<div class="measure-heading"><strong>Measure ${index + 1}</strong><button type="button" class="icon-btn" aria-label="Remove measure ${index + 1}">×</button></div><label class="field"><span>Success measure</span><input class="input" data-measure="metric" maxlength="120" placeholder="e.g. Books read"></label><div class="measure-values"><label class="field"><span>Current value</span><input class="input" data-measure="current" type="number" step="any" min="0" placeholder="Not recorded"></label><label class="field"><span>Target value</span><input class="input" data-measure="target" type="number" step="any" min="0" placeholder="e.g. 12"></label><label class="field"><span>Unit</span><input class="input" data-measure="unit" maxlength="20" placeholder="e.g. books"></label></div>`;
+    for (const key of ['metric', 'target', 'unit', 'current']) row.querySelector(`[data-measure="${key}"]`).value = measure[key] ?? '';
+    row.querySelector('button').addEventListener('click', () => {
+      state.wizard.measures = readWizardMeasures().filter(item => item.id !== row.dataset.id);
+      renderWizardMeasures(); persistWizardDraft();
+    });
+    container.append(row);
+  });
+}
+
+function renderDetailMeasures(goal) {
+  const container = $('detailMeasures');
+  container.replaceChildren();
+  const measures = goalMeasures(goal);
+  container.hidden = !measures.length;
+  if (!measures.length) return;
+  const heading = document.createElement('h4'); heading.textContent = 'Success measures'; container.append(heading);
+  measures.forEach((measure, index) => {
+    const row = document.createElement('div'); row.className = 'measure-result';
+    const description = document.createElement('div');
+    const name = document.createElement('strong'); name.textContent = measure.metric || `Measure ${index + 1}`;
+    const target = document.createElement('small'); target.textContent = measure.target != null ? `Target: ${measure.target}${measure.unit ? ' ' + measure.unit : ''}` : 'No numeric target';
+    description.append(name, target);
+    const label = document.createElement('label'); label.className = 'field';
+    const title = document.createElement('span'); title.textContent = 'Current value';
+    const input = document.createElement('input'); input.className = 'input'; input.type = 'number'; input.min = '0'; input.step = 'any'; input.placeholder = 'Not recorded'; input.value = measure.current ?? '';
+    input.setAttribute('aria-label', `Current value for ${measure.metric || 'measure ' + (index + 1)}`);
+    input.addEventListener('change', () => {
+      if (!input.checkValidity()) { input.reportValidity(); return; }
+      measures[index].current = input.value === '' ? null : Number(input.value);
+      goal.measures = measures;
+      goal.updatedAt = Date.now(); save(); render();
+    });
+    label.append(title, input); row.append(description, label); container.append(row);
+  });
 }
 
 function todayISO() {
@@ -230,7 +291,7 @@ function goalCardHTML(g, index = 0) {
       <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
       <div class="footer-row">
         <span class="deadline ${deadlineClass(g)}">${deadlineText(g)}</span>
-        ${g.metric ? `<span>${escapeHtml(g.metric)}${g.target ? `: ${g.target}${g.unit ? " " + escapeHtml(g.unit) : ""}` : ""}</span>` : ""}
+        ${goalMeasures(g).length ? `<span>${goalMeasures(g).length === 1 ? escapeHtml(goalMeasures(g)[0].metric || '1 measure') : goalMeasures(g).length + ' measures'}</span>` : ''}
       </div>
     </article>
   `;
@@ -250,6 +311,7 @@ function openWizard(editGoalId = null) {
     step: savedDraft?.step ?? 0,
     draftId: editGoalId,
     draftTasks: savedDraft?.tasks?.map((task) => ({ ...task })) || [],
+    measures: savedDraft?.measures?.map(measure => ({...measure})) || (savedDraft ? goalMeasures({metric: savedDraft.fields?.gMetric, target: savedDraft.fields?.gTarget === '' ? null : savedDraft.fields?.gTarget, unit: savedDraft.fields?.gUnit}) : []),
     editGoalId,
     draftKey,
   };
@@ -270,9 +332,7 @@ function openWizard(editGoalId = null) {
       $("gTitle").value = g.title || "";
       $("gSpecific").value = g.specific || "";
       $("gCategory").value = g.category || "";
-      $("gMetric").value = g.metric || "";
-      $("gTarget").value = g.target ?? "";
-      $("gUnit").value = g.unit || "";
+      state.wizard.measures = goalMeasures(g).map(measure => ({...measure}));
       $("gRelevant").value = g.relevant || "";
       $("gPriority").value = g.priority || "medium";
       $("gDeadline").value = g.deadline || "";
@@ -284,6 +344,8 @@ function openWizard(editGoalId = null) {
     $("gStart").value = todayISO();
   }
 
+  if (!state.wizard.measures.length) state.wizard.measures.push({id: uid(), metric: '', target: null, unit: '', current: null});
+  renderWizardMeasures();
   renderCategoryDatalist();
   renderWizardTasks();
   clearWizardError();
@@ -298,6 +360,7 @@ function persistWizardDraft() {
     step: state.wizard.step,
     fields: Object.fromEntries(WIZARD_FIELDS.map((field) => [field, $(field).value])),
     tasks: state.wizard.draftTasks.map((task) => ({ ...task })),
+    measures: readWizardMeasures(),
   };
   clearTimeout(wizardDraftSaveTimer);
   wizardDraftSaveTimer = setTimeout(() => {
@@ -466,6 +529,7 @@ function clearWizardError() {
 
 function wizardStepValid(step) {
   if (step === 0) return $("gTitle").value.trim().length > 0;
+  if (step === 1) return [...$('wizardMeasures').querySelectorAll('input')].every(input => input.checkValidity()) && readWizardMeasures().every(measure => measure.metric || (measure.target == null && measure.current == null && !measure.unit));
   if (step === 2) return state.wizard.draftTasks.length > 0;
   return true;
 }
@@ -473,6 +537,7 @@ function wizardStepValid(step) {
 function nextStep() {
   if (!wizardStepValid(state.wizard.step)) {
     if (state.wizard.step === 0) setWizardError("Give your goal a title before continuing.");
+    else if (state.wizard.step === 1) setWizardError("Name each measure and use valid, non-negative numbers.");
     else if (state.wizard.step === 2) setWizardError("Add at least one task before continuing.");
     return;
   }
@@ -499,15 +564,22 @@ function handleWizardSubmit(e) {
   }
 
   const id = $("goalId").value || uid();
+  if (!wizardStepValid(1)) {
+    showWizardStep(1);
+    setWizardError('Name each measure and use valid, non-negative numbers.');
+    return;
+  }
+  const measures = readWizardMeasures().filter(measure => measure.metric);
   const existing = state.goals.find((g) => g.id === id);
   const data = {
     id,
     title: $("gTitle").value.trim(),
     specific: $("gSpecific").value.trim(),
     category: $("gCategory").value.trim(),
-    metric: $("gMetric").value.trim(),
-    target: $("gTarget").value !== "" ? Number($("gTarget").value) : null,
-    unit: $("gUnit").value.trim(),
+    measures,
+    metric: measures[0]?.metric || '',
+    target: measures[0]?.target ?? null,
+    unit: measures[0]?.unit || '',
     relevant: $("gRelevant").value.trim(),
     priority: $("gPriority").value,
     deadline: $("gDeadline").value || null,
@@ -547,6 +619,7 @@ function openDetail(id) {
   $("detailTitle").textContent = goal.title;
   renderDetailMeta(goal);
   renderSmartSummary(goal);
+  renderDetailMeasures(goal);
   renderDetailTasks(goal);
   renderDetailProgress(goal);
   $("goalNotes").value = goal.notes || "";
@@ -565,14 +638,14 @@ function renderDetailMeta(g) {
     <span>Priority: <strong>${g.priority || "medium"}</strong></span>
     <span>${g.startDate ? "Started " + formatDate(g.startDate) : ""}</span>
     <span>${g.deadline ? "Due " + formatDate(g.deadline) : "No deadline"}</span>
-    ${g.metric ? `<span>Metric: <strong>${escapeHtml(g.metric)}${g.target != null ? " · " + g.target + (g.unit ? " " + escapeHtml(g.unit) : "") : ""}</strong></span>` : ""}
+    ${goalMeasures(g).length ? `<span><strong>${goalMeasures(g).length} success measure${goalMeasures(g).length === 1 ? '' : 's'}</strong></span>` : ''}
   `;
 }
 
 function renderSmartSummary(g) {
   const fields = [
     ["S · Specific", g.specific || g.title, true],
-    ["M · Measurable", g.metric ? `${g.metric}${g.target != null ? " (target " + g.target + (g.unit ? " " + g.unit : "") + ")" : ""}` : null, true],
+    ["M · Measurable", goalMeasures(g).map(measure => `${measure.metric}${measure.target != null ? ' (target ' + measure.target + (measure.unit ? ' ' + measure.unit : '') + ')' : ''}`).join(' · ') || null, true],
     ["A · Achievable", `${g.tasks.length} task${g.tasks.length === 1 ? "" : "s"} planned`, true],
     ["R · Relevant", g.relevant, true],
     ["T · Time-bound", g.deadline ? `Due ${formatDate(g.deadline)}` : "No deadline", true],
@@ -727,6 +800,12 @@ function setupEventListeners() {
   applyTheme();
 
   $("newGoalBtn").addEventListener("click", () => openWizard());
+  $('addMeasureBtn').addEventListener('click', () => {
+    state.wizard.measures = readWizardMeasures();
+    state.wizard.measures.push({id: uid(), metric: '', target: null, unit: '', current: null});
+    renderWizardMeasures(); persistWizardDraft();
+    $('wizardMeasures').lastElementChild.querySelector('input').focus();
+  });
 
   $("closeWizard").addEventListener("click", closeWizard);
   $("wizardForm").addEventListener("submit", handleWizardSubmit);

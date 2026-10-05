@@ -17,7 +17,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="assets/styles/style.css?v=sort-1">
+  <link rel="stylesheet" href="assets/styles/style.css?v=measures-1">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -90,21 +90,9 @@
       </div>
 
       <div class="wizard-panel" data-panel="measurable" hidden>
-        <p class="wizard-help">How will you know it’s done? Pick a measurable success signal.</p>
-        <label class="field">
-          <span>Success metric</span>
-          <input class="input" id="gMetric" maxlength="120" placeholder="Finish in under 2 hours">
-        </label>
-        <label class="field-row">
-          <label class="field">
-            <span>Target value</span>
-            <input class="input" id="gTarget" type="number" min="0" step="any" placeholder="21.1">
-          </label>
-          <label class="field">
-            <span>Unit</span>
-            <input class="input" id="gUnit" maxlength="20" placeholder="km, $, books">
-          </label>
-        </label>
+        <p class="wizard-help">Add one or more success measures. Each can have its own target and unit.</p>
+        <div id="wizardMeasures"></div>
+        <button type="button" class="btn-ghost" id="addMeasureBtn">＋ Add measure</button>
       </div>
 
       <div class="wizard-panel" data-panel="achievable" hidden>
@@ -181,6 +169,7 @@
     </section>
 
     <section class="smart-summary" id="smartSummary"></section>
+    <section class="measures-section" id="detailMeasures" aria-label="Goal measures"></section>
 
     <section class="tasks-section">
       <h4>Tasks</h4>
@@ -198,6 +187,6 @@
   </dialog>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/scripts/app.js?v=sort-1" defer></script>
+  <script src="assets/scripts/app.js?v=measures-1" defer></script>
 </body>
 </html>
