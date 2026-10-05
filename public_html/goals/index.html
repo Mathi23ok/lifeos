@@ -17,7 +17,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="assets/styles/style.css?v=measures-1">
+  <link rel="stylesheet" href="assets/styles/style.css?v=cards-2">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -27,6 +27,7 @@
       <div class="title-block">
         <div class="eyebrow">SMART Goal Tracker</div>
         <h1>Goals</h1>
+        <p class="page-intro">Turn your plans into steady progress.</p>
       </div>
       <div class="header-actions">
         <select class="select" id="categoryFilter" aria-label="Filter by category">
@@ -44,6 +45,7 @@
 
     <section class="stats-row" id="statsRow" aria-label="Overview stats"></section>
 
+    <div class="goals-list-heading"><h2>Your goals</h2><span id="goalListCount"></span></div>
     <main id="goalsMain" class="goals-grid" aria-live="polite"></main>
 
     <p class="empty-state" id="emptyState" hidden>
@@ -187,6 +189,6 @@
   </dialog>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/scripts/app.js?v=measures-1" defer></script>
+  <script src="assets/scripts/app.js?v=cards-2" defer></script>
 </body>
 </html>

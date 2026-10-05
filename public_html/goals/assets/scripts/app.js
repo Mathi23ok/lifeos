@@ -246,6 +246,7 @@ function renderGoals() {
     if (status && effectiveStatus(g) !== status) return false;
     return true;
   });
+  $('goalListCount').textContent = `${list.length} goal${list.length === 1 ? '' : 's'}`;
 
   if (!state.goals.length) {
     main.innerHTML = "";
@@ -266,6 +267,11 @@ function renderGoals() {
   // bind clicks
   main.querySelectorAll(".goal-card").forEach((el) => {
     el.addEventListener("click", () => openDetail(el.dataset.id));
+    el.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault(); openDetail(el.dataset.id);
+      }
+    });
   });
 }
 
@@ -273,25 +279,32 @@ function goalCardHTML(g, index = 0) {
   const status = effectiveStatus(g);
   const progress = calcProgress(g);
   const completedCount = g.tasks.filter((t) => t.done).length;
+  const measures = goalMeasures(g);
+  const nextTask = g.tasks.find(task => !task.done);
+  const priority = ['low', 'medium', 'high'].includes(g.priority) ? g.priority : 'medium';
+  const measureRows = measures.slice(0, 2).map(measure => {
+    const current = measure.current == null ? '—' : Number(measure.current).toLocaleString();
+    const target = measure.target == null ? '' : ` / ${Number(measure.target).toLocaleString()}`;
+    return `<div class="goal-measure-row"><span>${escapeHtml(measure.metric || 'Success measure')}</span><strong>${current}${target}${measure.unit ? ' ' + escapeHtml(measure.unit) : ''}</strong></div>`;
+  }).join('');
   return `
-    <article class="goal-card ${status}" data-id="${g.id}" style="--card-delay:${Math.min(index, 6) * 45}ms">
+    <article class="goal-card ${status}" data-id="${g.id}" tabindex="0" role="button" aria-label="Open goal: ${escapeHtml(g.title || 'Untitled goal').replace(/"/g, '&quot;')}">
       <div class="top-row">
-        ${g.category ? `<span class="category-pill">${escapeHtml(g.category)}</span>` : `<span></span>`}
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span class="status-tag ${status}">${status}</span>
-          <span class="priority-dot ${g.priority || "medium"}" title="${g.priority || "medium"} priority"></span>
-        </div>
+        <span class="category-pill">${escapeHtml(g.category || 'Uncategorized')}</span>
+        <span class="status-tag ${status}"><span aria-hidden="true">${status === 'completed' ? '✓' : status === 'archived' ? '−' : '●'}</span> ${status === 'active' ? 'In progress' : status === 'completed' ? 'Completed' : 'Archived'}</span>
       </div>
-      <h3>${escapeHtml(g.title || "Untitled goal")}</h3>
-      ${g.specific ? `<p class="desc">${escapeHtml(g.specific)}</p>` : ""}
-      <div class="progress-row">
-        <span>${progress}% · ${completedCount}/${g.tasks.length} tasks</span>
-        <span>${progress >= 100 ? "✓ done" : progress + "%"}</span>
+      <div class="goal-card-heading"><span class="priority-dot ${priority}" title="${priority} priority" aria-label="${priority} priority"></span><h3 dir="auto">${escapeHtml(g.title || "Untitled goal")}</h3></div>
+      ${g.specific ? `<p class="desc" dir="auto">${escapeHtml(g.specific)}</p>` : ''}
+      <div class="goal-card-progress">
+        <div class="progress-row"><span>Task progress</span><strong>${progress}<small>%</small></strong></div>
+        <div class="progress-track" role="progressbar" aria-label="Tasks completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><div class="progress-fill" style="width:${progress}%"></div></div>
+        <div class="goal-progress-caption"><span>${completedCount} of ${g.tasks.length} tasks done</span><span>${g.tasks.length - completedCount} remaining</span></div>
       </div>
-      <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+      ${measures.length ? `<div class="goal-card-measures"><div class="goal-section-label">Success measures${measures.length > 2 ? `<span>+${measures.length - 2} more</span>` : ''}</div>${measureRows}</div>` : ''}
+      <div class="goal-next-task"><span class="goal-section-label">${status === 'archived' ? 'Archived goal' : nextTask ? 'Next task' : g.tasks.length ? 'Checklist complete' : 'Get started'}</span><p dir="auto">${escapeHtml(status === 'archived' ? 'Open to review your plan' : nextTask?.title || (g.tasks.length ? 'All planned tasks are done' : 'Add your first task'))}</p></div>
       <div class="footer-row">
-        <span class="deadline ${deadlineClass(g)}">${deadlineText(g)}</span>
-        ${goalMeasures(g).length ? `<span>${goalMeasures(g).length === 1 ? escapeHtml(goalMeasures(g)[0].metric || '1 measure') : goalMeasures(g).length + ' measures'}</span>` : ''}
+        <span class="deadline ${deadlineClass(g)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${deadlineText(g)}</span>
+        <span class="goal-open" aria-hidden="true">View goal <span>↗</span></span>
       </div>
     </article>
   `;
