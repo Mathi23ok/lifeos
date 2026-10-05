@@ -1224,13 +1224,10 @@ function render() {
       : state.incomes
           .map(
             (inc) => `
-      <div class="fade-in row-item" style="padding:13px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ink-line);" onclick="showContextMenu(event,'income','${inc.id}')">
-        <div>
-          <div style="font-size:13px;font-weight:600;">${esc(inc.name)}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span class="num" style="font-size:13px;font-weight:700;color:#39E6AD;">${fmt(inc.amount)}</span>
-        </div>
+      <div class="fade-in row-item income-stream-row" onclick="showContextMenu(event,'income','${inc.id}')">
+        <span class="income-stream-name" dir="auto">${esc(inc.name)}</span>
+        <span class="num income-stream-amount">${fmt(inc.amount)}</span>
+        <button type="button" class="expense-menu-button" aria-label="${esc('Income actions')}" onclick="showContextMenu(event,'income','${inc.id}')">⋯</button>
       </div>`,
           )
           .join("");
@@ -1252,7 +1249,7 @@ function render() {
         <td style="padding:11px 0;font-size:11px;color:var(--muted);">${cat ? esc(cat.label.substring(0, 14)) : esc(e.categoryId)}</td>
         <td style="padding:11px 4px;font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.desc) || "—"}</td>
         <td class="num" style="padding:11px 0;text-align:end;font-size:12px;">${fmt(e.amount)}</td>
-        <td style="padding:11px 0;text-align:end;color:var(--muted-2);font-size:14px;">⋯</td>
+        <td style="padding:11px 0;text-align:end;"><button type="button" class="expense-menu-button" aria-label="${esc('Expense actions')}" onclick="showContextMenu(event,'expense','${e.id}')">⋯</button></td>
       </tr>`;
       })
       .join("");

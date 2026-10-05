@@ -1764,3 +1764,11 @@ canvas {
     font-size: 6.5pt;
   }
 }
+.row-item:where(tr)::after{display:none}
+.expense-menu-button{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;background:transparent;color:var(--muted);border-radius:6px;font-size:18px;line-height:1}
+.expense-menu-button:hover{background:var(--ink-soft);color:var(--jade)}
+#incomeList .income-stream-row{display:grid;grid-template-columns:minmax(0,1fr) max-content 28px;align-items:center;gap:10px;min-height:54px;padding:10px 14px;border-bottom:1px solid var(--ink-line)}
+#incomeList .income-stream-row::after{display:none}
+.income-stream-name{min-width:0;overflow-wrap:anywhere;font-size:13px;font-weight:600;line-height:1.5}
+.income-stream-amount{font-size:13px;font-weight:700;color:var(--jade);text-align:end;white-space:nowrap;direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+#incomeList .income-stream-row:last-child{border-bottom:0}
