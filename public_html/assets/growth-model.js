@@ -1,3 +1,4 @@
+import './goal-progress.js';
 // Connections live separately; source workspaces remain the owners of their records.
 export const KEY = 'edi_growth_v1';
 export const dimensions = [
@@ -31,17 +32,11 @@ export function sources() {
   return {goals,tasks};
 }
 export async function habitData() {
-  const end=today(), start=addDays(end,-6);
-  const responses = await Promise.all([
-    fetch('/habittify/api.php?route=habits', {cache:'no-store',redirect:'error'}),
-    fetch(`/habittify/api.php?route=logs&start=${start}&end=${end}`, {cache:'no-store',redirect:'error'})
-  ]);
-  if (responses.some(r=>!r.ok)) throw Error('Habits unavailable. Refresh to retry.');
-  const [h,l] = await Promise.all(responses.map(r=>r.json()));
-  if (!Array.isArray(h.habits) || !l.logs || typeof l.logs!=='object') throw Error('Invalid habit response.');
-  return {habits:h.habits, logs:l.logs};
+  return LifeGoalProgress.load(sources().goals,true);
 }
-export function goalProgress(goal) {
+
+export function goalProgress(goal, habit = null) {
+  if(goal.progressSource) return LifeGoalProgress.result(goal,habit).pct;
   const tasks=array(goal.tasks), measures=array(goal.measures).length ? goal.measures : [{target:goal.target,current:goal.current}];
   const ratios=measures.filter(m=>Number(m.target)>0 && m.current!==null && m.current!==undefined && Number.isFinite(Number(m.current))).map(m=>Math.max(0,Math.min(100,Number(m.current)/Number(m.target)*100)));
   const parts=[];
@@ -57,7 +52,7 @@ export function summary(plans, source, habit) {
   for (const task of source.tasks) if (task.page==='goals' && goalIds.has(String(task.goalId)) && !task.archived) taskKeys.add(task.key);
   const tasks=source.tasks.filter(t=>taskKeys.has(t.key) && !t.archived);
   const habits=habit ? habit.habits.filter(h=>habitIds.has(String(h.id))) : [];
-  const percentages=goals.map(goalProgress).filter(p=>p!==null);
+  const percentages=goals.map(g=>goalProgress(g,habit)).filter(p=>p!==null);
   let eligible=0, completed=0;
   for (const h of habits) for (let i=0;i<7;i++) {
     const day=addDays(today(),-i);

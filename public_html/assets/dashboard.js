@@ -1,3 +1,4 @@
+import './goal-progress.js';
 import { refreshWeatherCard } from './weather.js?v=weather-7d-1';
 import { remainingSeconds } from './timer.mjs';
 import { mountGrowthOverview, refreshGrowthOverview } from './growth-overview.js';
@@ -208,13 +209,15 @@ export async function refreshDashboard() {
   // ── goals ──────────────────────────────────────────────────────────
   const goalsData = readJson('edi_goals_v1');
   const goals = safeArray(goalsData?.goals).filter(g => g && g.status !== 'archived');
-  const activeGoals = goals.filter(g => !(isArray(g.tasks) && g.tasks.length && g.tasks.every(t => t.done)));
+  let goalHabitContext=null;
+  if(goals.some(g=>g.progressSource==='habit')) {try {goalHabitContext=await LifeGoalProgress.load(goals);} catch { /* Show unavailable instead of invented attendance. */ }}
+  const activeGoals = goals.filter(g => LifeGoalProgress.result(g,goalHabitContext).pct!==100);
   const goalProgress = activeGoals.map(g => {
-    const tasks = safeArray(g.tasks);
-    const done = tasks.filter(t => t.done).length;
-    return { goal: g, total: tasks.length, done, pct: tasks.length ? done / tasks.length * 100 : 0 };
+    const p=LifeGoalProgress.result(g,goalHabitContext);
+    return {goal:g,total:p.total,done:p.done,pct:p.pct,unit:p.unit};
   });
-  const goalAvg = goalProgress.length ? goalProgress.reduce((sum, g) => sum + g.pct, 0) / goalProgress.length : 0;
+  const knownGoalProgress=goalProgress.filter(g=>g.pct!==null);
+  const goalAvg = knownGoalProgress.length ? knownGoalProgress.reduce((sum, g) => sum + g.pct, 0) / knownGoalProgress.length : 0;
   const dueSoon = activeGoals.filter(g => {
     if (!g.deadline) return false;
     return (new Date(g.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) <= 7 * 86400000;
@@ -262,7 +265,7 @@ export async function refreshDashboard() {
     if (sequence !== refreshSequence) return;
   }
   // MySQL returns habit IDs as strings while the logs API emits integers.
-  refreshGrowthOverview(habitsOk ? {habits, logs} : null);
+  refreshGrowthOverview(habitsOk ? {habits, logs: {...logs,...(goalHabitContext?.logs || {})}} : null);
   const habitIds = new Set(habits.map(h => String(h.id)));
   const totalHabits = habits.length;
   const completedCount = key => new Set(safeArray(logs[key]).map(String).filter(id => habitIds.has(id))).size;
@@ -546,7 +549,7 @@ function renderGoalList(goalProgress, today) {
       else chip = `<span class="chip ok">${days}d left</span>`;
     }
     return `<div class="goal-row">
-      <div class="goal-head"><span class="goal-name">${goal.title}<span class="goal-cat">${goal.category || 'General'}${total ? ` · ${done}/${total} tasks` : ''}</span></span><span class="goal-pct">${number(Math.round(pct))}%</span></div>
+      <div class="goal-head"><span class="goal-name">${goal.title}<span class="goal-cat">${goal.category || 'General'}${total ? ` · ${done ?? "—"}/${total} ${goal.progressSource === "habit" ? "days" : "tasks"}` : ''}</span></span><span class="goal-pct">${pct===null?"—":number(Math.round(pct))+"%"}</span></div>
       <span class="goal-track"><span class="goal-fill" data-w="${clamp(pct)}"></span></span>
       <span class="goal-meta"><span>${goal.metric || ''}</span>${chip}</span>
     </div>`;
@@ -613,7 +616,7 @@ function renderFinance() {
       const pct = category.target > 0 ? clamp(amount / category.target * 100) : 100;
       const over = category.target > 0 && amount > category.target;
       return `<div class="fin-cat">
-        <div class="fin-cat-head"><span>${category.label}${over ? ' · over' : ''}</span><b>${number(Math.round(pct))}% of budget</b></div>
+        <div class="fin-cat-head"><span>${category.label}${over ? ' · over' : ''}</span><b>${pct===null?"—":number(Math.round(pct))+"%"} of budget</b></div>
         <span class="fin-cat-track"><span class="fin-cat-fill" data-w="${pct}" style="${over ? 'background:var(--danger)' : ''}"></span></span>
       </div>`;
     }).join('')}</div>`;

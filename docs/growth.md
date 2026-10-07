@@ -49,3 +49,11 @@ Task references are JSON-encoded tuples: `["goal", goalId, taskId]` or `["kanban
 `assets/growth-model.js` provides shared source resolution and calculations for Growth and Overview. `growth/app.js` owns forms and reviews. Growth writes through the shared storage mutation queue, session authentication, CSRF token and compare-and-swap revisions, and shows success only after the server confirms the write. A form opened before another change must be reopened instead of overwriting it. No SQL schema migration is required.
 
 No dedicated growth endpoint or MCP tool has been added. Existing integration clients continue to edit source goals, habits and tasks, and Growth derives updated indicators on refresh. Deploy the new growth assets together with `state.php`, shared storage, navigation, dashboard and Goals deep-link changes.
+
+## Habit-driven SMART goals
+
+Choose **Linked habit** in the goal editor's Measurable step, select a habit and completed-day target, then set a start date and deadline. Habittify is the attendance record: unique completed dates inside the inclusive window, through today in Asia/Tehran, divided by the target (capped at 100%). Undoing attendance updates progress too. Historical logs still count after archiving a habit. No automatic attendance or duplicated goal tasks are created.
+
+The goal card and detail show the count, automatic quarter milestones and a Habittify link. Habit settings only appear for this source; manual measure inputs and checklist controls are hidden. Existing checklist goals retain their behavior. Explicit Success measures goals use the average capped current/target ratio of their numeric measures.
+
+Goal API/MCP accepts `progressSource` (`checklist`, `measure`, `habit`) and `habitProgress` (`habitId`, optional `habitName`, `targetDays`). Habit goals require valid start/deadline dates and a whole-day target within that window. GET goals includes derived `progress` and `effectiveStatus`; these are read-only outputs, never stored attendance. Overview and Life Review use the same habit progress definition. If logs cannot be read, the goal displays unavailable progress and keeps its saved settings.
