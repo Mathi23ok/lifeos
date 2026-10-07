@@ -1,125 +1,168 @@
 # Edi Life OS
 
-A private dashboard for focus, finance, habits, kanban, goals, and Markdown notes. Requires PHP 8.1+, mbstring, PDO MySQL, and MySQL 8+ (also tested with MariaDB 10.4). App data is stored in MySQL. Existing browser data is imported once; conflicting older copies are archived in the `app_state` table as `legacy_backup_*` rows.
+**A personal workspace for focus, habits, finances, and meaningful progress.**
 
-![Edi Life OS preview](intro-preview.gif)
+Edi Life OS brings everyday planning into one private dashboard. Manage projects, build small habits, track money, and keep your notes close—with a shared visual style across every page.
 
-## Setup
+Built with PHP, MySQL, and vanilla JavaScript. The browser application requires no frontend build step.
 
-1. Copy `config.example.php` to `config.php`, then set your MySQL host, database name, database account, and app login. `config.php` is ignored by Git; **never commit real credentials**.
-2. Ensure the MySQL account can create the database and tables (or have an administrator grant those privileges).
-3. From the repository root, run `php -S localhost:8000 -t public_html server.php` and open <http://localhost:8000>. The first login creates the database and all tables automatically.
+![Edi Life OS dashboard preview](intro-preview.gif)
 
-For Apache, use `public_html` as the document root and enable `.htaccess` rewrites. Use HTTPS outside localhost.
+[Features](#features) · [Getting started](#getting-started) · [API](#api-and-integrations) · [Development](docs/development.md) · [Deployment](docs/deployment.md)
 
-The app login in `config.php` seeds the `app_credentials` table on first use. After that, use **Settings → Sign-in credentials** to change the username or password. The password is stored as a hash in MySQL, and saving credentials signs out other sessions.
+## Features
 
-To preserve an existing Habittify SQLite database, run `php migrate-sqlite.php /absolute/path/to/habits.db` **before opening the app** with the new MySQL database. This requires empty habit tables and leaves the SQLite file untouched.
+| Workspace | What you can do |
+| --- | --- |
+| **Overview** | See focus activity, habit progress, goals, finances, and a seven-day weather forecast. |
+| **Focus** | Work in timed sessions with short and long breaks, progress tracking, and session history. |
+| **Finance** | Track expenses, income streams, and budgets in Toman, with searchable categories and period-based records. |
+| **Habittify** | Maintain daily habits and follow completion, streaks, and monthly progress. |
+| **Kanban** | Organize projects with draggable cards and lists, priorities, labels, dates, checklists, comments, and file attachments. Move cards between projects. |
+| **Calendar** | View due cards across all boards in Month or Schedule view, with search, board filters, and overdue items. |
+| **Goals** | Plan SMART goals with multiple measures, deadlines, priorities, and sortable task checklists. |
+| **Notepad** | Write Markdown notes with editing, preview, and export. |
+| **Notes** | Arrange sticky notes with colors, fonts, and connections. |
+| **Settings** | Change the theme and manage your sign-in credentials. |
 
-Run `node --test tests/timer.test.mjs` for timer checks.
+Calendar uses **Asia/Tehran** for dates and overdue status. Selecting an event opens its original Kanban card.
 
-The Overview weather card loads Qeshm Island's current forecast and next seven days through the local `weather.php` endpoint, which requests Open-Meteo over verified HTTPS. Its tide trend and next high/low are derived from Open-Meteo's nearby offshore hourly sea-level model; this is a coastal estimate above mean sea level, not navigation data. The server needs internet access and PHP cURL. The card shows an unavailable state if either feed fails.
+The weather card shows current conditions and a seven-day forecast for Qeshm Island through Open-Meteo. Its tide information is a modeled coastal estimate and is unsuitable for navigation. Weather requires PHP cURL and outbound HTTPS access.
 
-## LifeOS API
+## Requirements
 
-The private `/api/v1/*` API uses a dedicated bearer token, independent of browser sign-in. Generate at least 32 random bytes (for example `php -r 'echo bin2hex(random_bytes(32));'`) and place the result in the ignored `config.php` as `api_token`, or set `LIFEOS_API_TOKEN` on the PHP process. The environment takes precedence, including an empty value that disables access. Placeholder tokens and tokens shorter than 32 characters are rejected. Keep `api_allow_secret_notes` false unless secret-note API access is intended.
+| Component | Requirement |
+| --- | --- |
+| PHP | **8.1+**, with `pdo_mysql` and `mbstring` |
+| Database | **MySQL 8+**; also tested with MariaDB 10.4 |
+| Web server | PHP development server locally; Apache with rewrite support for hosting |
+| Weather | PHP `curl` extension and outbound HTTPS access |
+| MCP server | Optional: **Node.js 22.9+** and npm |
+| PHP API tests | Optional: `pdo_sqlite` in addition to the application extensions |
+
+## Getting started
+
+### 1. Get the source
+
+```sh
+git clone https://github.com/edrisranjbar/lifeos.git
+cd lifeos
+```
+
+### 2. Configure the application
+
+Copy the example configuration:
+
+```sh
+cp config.example.php config.php
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item config.example.php config.php
+```
+
+Edit `config.php` with your database connection and initial app username and password. Use an account that can create the database and application tables, or arrange those privileges with your database administrator.
+
+**Keep real credentials in the ignored `config.php`. Never commit them.**
+
+### 3. Start the local server
+
+From the repository root:
+
+```sh
+php -S localhost:8000 -t public_html server.php
+```
+
+Open [localhost:8000](http://localhost:8000) and sign in with the credentials you configured. The backend creates its database and tables on first database access.
+
+### 4. Manage your sign-in
+
+The configured login seeds the `app_credentials` table on first use. After that, change your username or password in **Settings → Sign-in credentials**. Passwords are hashed in MySQL; changing credentials signs out other sessions.
+
+For Apache and shared hosting, follow the [deployment guide](docs/deployment.md).
+
+## Data and persistence
+
+Application state is stored in MySQL. Habits and completion logs use dedicated tables; other workspaces use JSON documents in `app_state`.
+
+- Existing browser data is imported once. Conflicting older copies are archived as `legacy_backup_*` records.
+- Browser saves use revision checks to protect against stale changes. If a conflict occurs, preserve your unsaved edits and reload.
+- API mutations use transactions and row locks. Reload the browser after changes made through an external client.
+- Back up the database, private attachment files, and deployment configuration together.
+
+Migrating an existing Habittify SQLite database? Follow the [migration instructions](docs/deployment.md#migrating-habittify-from-sqlite) before opening Habittify against the new database.
+
+## API and integrations
+
+### HTTP API
+
+The private `/api/v1` API provides access to dashboard context, goals, tasks, habits, finances, and sticky notes. It uses a dedicated bearer token independent of browser sign-in.
+
+Generate a token:
+
+```sh
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+Set it as `api_token` in the ignored server configuration, or as the PHP process environment variable `LIFEOS_API_TOKEN`. Configure the same token in your client environment.
+
+Example request in a POSIX shell:
 
 ```sh
 curl -H "Authorization: Bearer $LIFEOS_API_TOKEN" \
   https://example.com/api/v1/dashboard
-
-curl -X POST -H "Authorization: Bearer $LIFEOS_API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"Build dream home studio","specific":"Turn a 3x3m room into a studio","priority":"high","startDate":"2026-10-07","deadline":"2027-01-07","measures":[{"metric":"Studio Readiness Score","target":8,"unit":"/10","current":0}],"tasks":[{"title":"Repair walls"},{"title":"Install carpet"}]}' \
-  https://example.com/api/v1/goals
-
-curl -X POST -H "Authorization: Bearer $LIFEOS_API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"category_id":"food","description":"Dinner","amount":450000,"date":"2026-10-07"}' \
-  https://example.com/api/v1/finance/expenses
 ```
 
-Use HTTPS outside localhost: the token grants read/write access to the domains below. Never put it in URLs, Git, screenshots, logs or frontend JavaScript. Rotate it by changing the server setting and client environment. No endpoint returns config or credentials. This is a single-owner API, without token scopes or a rate limiter. Configure host-level request limits and omit Authorization headers from access logs. Errors contain no stack traces or SQL parameters.
+Use your own application URL. See the [API reference](docs/api.md) for authentication, endpoints, payloads, and error handling.
 
-### Routes and formats
+### MCP server
 
-Success is `{ "data": ... }`; errors are `{ "error": { "code": "...", "message": "...", "details": {} } }`. Creation/upsert POSTs return 201; completion returns 200. Deletion returns `{ "data": { "deleted": true } }`. Responses are JSON with `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`. Request bodies are limited to 1 MB; saved documents to 2 MB. Statuses: malformed JSON 400, unauthorized 401, forbidden secret access 403, absent resource 404, wrong method 405, conflict 409, oversized 413, validation 422, internal failure 500 and database failure 503.
-
-| Domain | Routes relative to `/api/v1` | Behavior |
-| --- | --- | --- |
-| Context | `GET /health`, `GET /dashboard` | Authenticated health and compact Tehran dashboard |
-| Goals | `GET/POST /goals`, `GET/PATCH/DELETE /goals/{id}` | SMART goals with nested tasks/measures |
-| Tasks | `GET/POST /tasks`, `GET/PATCH/DELETE /tasks/{id}`, `POST /tasks/{id}/complete` | Goal checklists and Kanban cards |
-| Habits | `GET /habits`, `GET /habits/today`, `POST/DELETE /habits/{id}/complete` | Existing SQL tables, idempotent completion |
-| Finance | `GET /finance`, `GET/POST /finance/expenses`, `GET/POST /finance/incomes` | Existing period map, Toman amounts |
-| Notes | `GET/POST /notes`, `GET/PATCH/DELETE /notes/{id}` | Sticky notes and connection cleanup |
-
-Unsupported request fields are rejected; existing unknown fields are preserved. PATCH merges supported fields; supplied `tasks`/`measures` lists replace their lists, preserving extra fields on entries with matching IDs. Missing IDs are UUIDs. Goal status follows the UI: all tasks done means completed; editable status is active or archived. Numeric measure values can be null. Dates must be real ISO dates; startDate cannot follow deadline.
-
-Tasks require `source: "goal"` with `goal_id`, or `source: "kanban"` with `board_id` and `column_id`. Lists accept source/container filters. Individual routes accept `source`, `goal_id`, `board_id` when an ID is ambiguous (otherwise 409). Goal tasks inherit the goal deadline unless they have their own dueDate. Goal tasks do not support descriptions. Kanban completion uses normalized column names Done, Completed or Complete; completing moves to an existing such column, otherwise 409. Reopening requires `done: false` with a non-complete column_id. Card labels, attachments, comments and checklists survive updates.
-
-Habit completion accepts optional `{ "date": "YYYY-MM-DD" }`, defaulting to today in Asia/Tehran. Two completes leave one completed row; two uncompletes leave none. Archived habits cannot be completed. The browser retains its existing toggle behavior.
-
-Finance accepts an existing `period` (query for GET, body for POST), defaulting to active or the first saved period like the UI. Expenses require an existing category_id and positive amount; description and ISO date are optional. Stored expenses retain `{id, categoryId, desc, amount, date}` and an English month/day label like the UI; the year is identified by the period. Incomes require name and positive amount; the lowercased name with whitespace replaced by underscores generates the ID. Repeating that ID updates its amount. Active-period writes synchronize the legacy daramd_v1 mirror, retaining other periods. An uninitialized account gets the same default categories as the browser.
-
-Secret notes are excluded from default reads and dashboard. Hidden IDs return 404 for get/update/delete. `include_secret=1` requires `api_allow_secret_notes => true`, otherwise 403. Creating or making a note secret returns only ID and secret flag unless access was explicitly enabled/requested. Notes use UI geometry/font defaults. Delete removes related `{a,b}` connections.
-
-### Concurrency and hosting
-
-API mutations lock app_state rows in key order within a transaction (`SELECT ... FOR UPDATE`), including absent-row initialization. Habit writes use the existing unique habit/date key and transactions. No schema migration is required.
-
-Browser saves send a SHA-256 revision from their last load/successful write. Stale saves return 409, stop queued saves for that document and ask the user to copy unsaved edits and reload. This prevents a stale whole-document save from overwriting API changes; it does not merge edits. Reload after external updates. Deploy state.php, lib/ and assets/storage.js together; reload already-open clients. Old clients without revisions are rejected rather than overwriting newer data.
-
-The PHP development router and Apache router.php/.htaccess route API requests before session authentication. Apache must preserve Authorization; the supplied rewrite does this. Keep public_html as document root for standard Apache hosting. For flattened shared hosting, put API PHP files/lib alongside the backend and adapt server.php's public root, router.php and Habittify's helper paths to that layout. Never expose config.php, mcp/, tests or private storage as downloadable assets.
-
-## MCP Server
-
-The Node stdio server uses the [official MCP SDK](https://ts.sdk.modelcontextprotocol.io/server), calls only HTTP API routes, and has no database credentials. See [mcp/README.md](mcp/README.md) for tools and client configuration.
+The optional Node.js MCP server exposes application tools over **stdio** and calls the HTTP API. It does not require database credentials.
 
 ```sh
 cd mcp
-npm install
+npm ci
 cp .env.example .env
-# Set LIFEOS_BASE_URL=https://example.com and LIFEOS_API_TOKEN
+# Set LIFEOS_BASE_URL and LIFEOS_API_TOKEN in .env
 npm start
-npm test
 ```
 
-Use Node 22.9+ (24 recommended). npm start loads the ignored .env from mcp; direct script launches need client-provided environment or Node --env-file. This server has no remotely hosted MCP HTTP endpoint.
+On Windows, use `Copy-Item .env.example .env`. See the [MCP guide](mcp/README.md) for available tools and client configuration.
 
-## API/MCP verification
+There is no remotely hosted MCP HTTP endpoint. The application API URL is not an MCP transport URL.
 
-Tests never load the repository config.php or production credentials:
+## Project structure
 
-```sh
-node --test tests/timer.test.mjs
-php tests/api_test.php
-cd mcp && npm test
+```text
+public_html/          Browser pages, assets, and Apache entry points
+lib/                  API domains, response helpers, and state transactions
+mcp/                  Optional Node.js stdio MCP server
+tests/                Timer, API, MySQL, and integration checks
+docs/                 API, development, and deployment guides
+config.example.php    Configuration template without real credentials
+server.php            PHP development router and application routing
+api.php               HTTP API entry point
 ```
 
-PHP tests require PDO SQLite and mbstring. They exercise auth, JSON validation, rollback/revisions, goals CRUD, both task sources, habits, finance totals and secret notes. Node tests cover schemas, mocked errors, malformed responses, timeout, credential redaction and a real SDK stdio handshake. Optional API integration is skipped unless LIFEOS_TEST_BASE_URL is set.
+## Development
 
-For actual MySQL verification, start a disposable localhost MySQL/MariaDB instance on port 3308 with a test-only root account and empty password:
+See the [development guide](docs/development.md) for local checks and an isolated MySQL integration workflow.
 
-```sh
-php tests/mysql_fixture.php 3308
-php tests/api_mysql_test.php
-# In the temporary app directory printed by the fixture command:
-php -S localhost:8000 -t public_html server.php
-# From the repository, with LIFEOS_TEST_BASE_URL=http://localhost:8000:
-cd mcp && npm test
-```
+The test fixtures use disposable data and do not load the repository's production configuration. Running tests locally does not establish compatibility with a particular hosting environment.
 
-The fixture creates a random lifeos_api_test_* database and an app copy in system temp, synthetic sign-in (`api-fixture` / `fixture-only-password`), and a random token saved only in ignored .secrets/api-test-context.json. MySQL tests run concurrent workers. Integration verifies HTTP CRUD, habits, finance persistence through browser state, stale-write conflict and a real MCP process against local API. Stop test processes afterward and remove the disposable database/app copy. Do not run fixtures against a shared or production instance.
+## Security
 
-PHP syntax checks (POSIX shell):
+Edi Life OS is designed for a **single owner**. The API token grants read and write access to its supported domains; token scopes and application-level rate limiting are not implemented.
 
-```sh
-php -l api.php
-php -l api_auth.php
-for file in lib/*.php; do php -l "$file"; done
-```
+Use HTTPS outside localhost. Keep tokens out of URLs, frontend code, screenshots, and logs, and configure request limits at the hosting layer.
 
-## Calendar
+Secret notes are hidden from API reads by default. Their secret flag controls visibility; it does not provide separate encrypted storage.
 
-Open Calendar (`#calendar`) for due cards from every Kanban board. Month places cards on their saved due dates; Schedule lists all dated cards across months. Board filters, search, an overdue list, and an optional completed-card filter help narrow the view. Completed cards are included by default. Cards without a valid due date are counted separately. Dates and overdue status use Asia/Tehran, and selecting an event opens its original Kanban card editor. Board changes update the calendar through the existing shared state channel; Refresh reloads the latest MySQL state.
+## Documentation
+
+- [API reference](docs/api.md) — authentication, routes, data formats, and concurrency.
+- [MCP guide](mcp/README.md) — tools, environment settings, and client setup.
+- [Deployment guide](docs/deployment.md) — Apache, shared hosting, backups, and migration.
+- [Development guide](docs/development.md) — local checks and disposable integration fixtures.
