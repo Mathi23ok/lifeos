@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__, 2) . '/auth.php';
+require_once dirname(__DIR__, 2) . '/lib/api_response.php';
+require_once dirname(__DIR__, 2) . '/lib/habits.php';
 life_os_require_auth();
 
 header('Content-Type: application/json; charset=utf-8');
@@ -84,7 +86,7 @@ try {
     $payload = body();
 
     if ($method === 'GET' && $route === 'habits') {
-        $rows = $db->query("SELECT id, name, category, color, icon, created_at FROM habits WHERE archived = 0 ORDER BY CASE WHEN category = '' THEN 1 ELSE 0 END, lower(category), id")->fetchAll();
+        $rows = habits_active($db);
         respond(['habits' => $rows]);
     }
 
