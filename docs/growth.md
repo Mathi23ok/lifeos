@@ -25,6 +25,8 @@ These indicators are not a wellbeing score. No composite life percentage is inve
 
 ## Reviews
 
+Life Review is an eight-step flow: choose a cadence, reflect on each of the six dimensions, then edit the final summary before saving. Each dimension shows its connected progress and previous next step. Back/Continue and the step navigation retain input. Closing the modal keeps the draft in memory while the Growth page remains open; reloading or navigating away from that page discards the unsaved draft. Only the final Save review action writes a review. The layout uses a sidebar on desktop and compact step markers on mobile.
+
 Reviews store the Tehran date, cadence, reflection and next step per dimension, and a numeric snapshot of goal/habit/task indicators at save time. Historical snapshots stay unchanged when source records change. Due dates follow a rolling interval from the latest review of the same cadence: weekly 7 days, monthly 30 days, quarterly 90 days. A cadence without a previous review is due today. There are no background notifications or email reminders.
 
 ## Persistence and architecture

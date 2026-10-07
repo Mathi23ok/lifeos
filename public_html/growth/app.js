@@ -1,10 +1,13 @@
 import {KEY, dimensions, array, documentState, sources, habitData, summary, goalProgress, today, nextReview} from '../assets/growth-model.js';
+import {createReviewStepper} from './review-stepper.js?v=1';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const percent=value=>value===null?'Not measured':`${value}%`;
 const prettyDate=value=>value && !Number.isNaN(new Date(value+'T12:00:00Z').getTime())?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z')):'No target date';
 let selected=dimensions.some(d=>d.id===location.hash.slice(1))?location.hash.slice(1):'spirituality';
 let doc, source, habit=null, editing=null, baseline=null, refreshSequence=0, refreshing=false;
+let reviewSaving=false;
+const reviewStepper=createReviewStepper($('reviewDialog'),dimensions);
 for (const id of ['addPlan','reviewBtn','refresh']) $(id).disabled=true;
 const activePlans=id=>doc.plans.filter(p=>p.dimensionId===id && p.status!=='archived');
 const snapshot=s=>({goalPct:s.goalPct,habitPct:s.habitPct,taskPct:s.taskPct,habitAvailable:!!habit,goals:s.goals.length,habits:s.habits.length,tasks:s.tasks.length,done:s.done,completed:s.completed,eligible:s.eligible});
@@ -61,9 +64,9 @@ function openPlan(id=null) {
   $('planError').textContent='';$('planDialog').showModal();$('planTitle').focus();
 }
 function openReview(cadence='weekly') {
-  baseline=appStorage.getItem(KEY);$('cadence').value=cadence;
-  $('reviewFields').innerHTML=dimensions.map(d=>{const s=summary(activePlans(d.id),source,habit);const last=[...doc.reviews].reverse().find(r=>r.notes?.[d.id]?.next);return `<section class="review-field"><h3>${d.icon} ${d.name}</h3><p class="help">${s.goals.length} SMART goals · ${percent(s.goalPct)} · ${s.done}/${s.tasks.length} tasks done · Habits ${habit?percent(s.habitPct):'unavailable'}</p>${last?`<p class="help" dir="auto">Previous next step: ${esc(last.notes[d.id].next)}</p>`:''}<label>What went well? What needs to change?<textarea name="reflection-${d.id}" rows="3" maxlength="3000" dir="auto"></textarea></label><label>Your next concrete step<input name="next-${d.id}" maxlength="500" dir="auto"></label></section>`;}).join('');
-  $('reviewError').textContent='';$('reviewDialog').showModal();
+  baseline=appStorage.getItem(KEY);
+  const reviews=[...doc.reviews].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  reviewStepper.open({cadence,habitAvailable:!!habit,lastDate:reviews[0]?prettyDate(reviews[0].date):null,stats:Object.fromEntries(dimensions.map(d=>[d.id,summary(activePlans(d.id),source,habit)])),previous:Object.fromEntries(dimensions.map(d=>[d.id,reviews.find(r=>r.notes?.[d.id]?.next)?.notes[d.id].next||'']))});
 }
 async function persist(next) {
   if (appStorage.getItem(KEY)!==baseline) throw Error('Your growth workspace changed while this form was open. Close and reopen it to use the latest connections.');
@@ -88,7 +91,10 @@ $('planForm').onsubmit=async event=>{
   }catch(error){$('planError').textContent=error.message;}finally{$('savePlan').disabled=false;}
 };
 $('reviewForm').onsubmit=async event=>{
-  event.preventDefault();$('saveReview').disabled=true;
+  event.preventDefault();
+  if(reviewSaving)return;
+  if(!reviewStepper.isSummary()){reviewStepper.next();return;}
+  reviewSaving=true;$('saveReview').disabled=true;reviewStepper.setBusy(true);
   try {
     // Capture current source activity, rather than the values at form opening.
     await appStorage.sync();
@@ -96,12 +102,12 @@ $('reviewForm').onsubmit=async event=>{
     const current=documentState(),form=new FormData(event.target),notes={},values={};
     for(const d of dimensions){notes[d.id]={reflection:String(form.get('reflection-'+d.id)||'').trim(),next:String(form.get('next-'+d.id)||'').trim()};values[d.id]=snapshot(summary(current.plans.filter(p=>p.dimensionId===d.id&&p.status!=='archived'),sources(),habit));}
     if(!Object.values(notes).some(n=>n.reflection||n.next))throw Error('Add a reflection or next step before completing your review.');
-    await persist({...current,reviews:[...current.reviews,{id:crypto.randomUUID(),cadence:$('cadence').value,date:today(),createdAt:new Date().toISOString(),notes,snapshot:values}]});$('reviewDialog').close();
-  }catch(error){$('reviewError').textContent=error.message;}finally{$('saveReview').disabled=false;}
+    await persist({...current,reviews:[...current.reviews,{id:crypto.randomUUID(),cadence:$('cadence').value,date:today(),createdAt:new Date().toISOString(),notes,snapshot:values}]});reviewStepper.clearDraft();$('reviewDialog').close();
+  }catch(error){$('reviewError').textContent=error.message;}finally{reviewSaving=false;$('saveReview').disabled=false;reviewStepper.setBusy(false);}
 };
 document.addEventListener('click',event=>{
   const button=event.target.closest('button');if(!button)return;
-  if(button.hasAttribute('data-close')&&!button.closest('form').querySelector('button:disabled'))button.closest('dialog').close();
+  if(button.hasAttribute('data-close')&&!(button.closest('dialog').id==='reviewDialog'?reviewSaving:$('savePlan').disabled))button.closest('dialog').close();
   if(button.dataset.dimension){selected=button.dataset.dimension;location.hash=selected;render();}
   if(button.dataset.review)openReview(button.dataset.review);
   if(button.dataset.edit)openPlan(button.dataset.edit);
@@ -110,7 +116,7 @@ document.addEventListener('click',event=>{
   if(button.dataset.task){const task=source.tasks.find(t=>t.key===button.dataset.task);if(task)navigate(task.page,task);}
 });
 document.addEventListener('input',event=>{if(!event.target.matches('.picker-search'))return;const q=event.target.value.toLowerCase();for(const row of event.target.closest('fieldset').querySelectorAll('[data-search]'))row.hidden=!row.dataset.search.includes(q);});
-for (const dialog of [$('planDialog'),$('reviewDialog')]) dialog.addEventListener('cancel',event=>{if(dialog.querySelector('button:disabled'))event.preventDefault();});
+for (const dialog of [$('planDialog'),$('reviewDialog')]) dialog.addEventListener('cancel',event=>{if(dialog.id==='reviewDialog'?reviewSaving:$('savePlan').disabled)event.preventDefault();});
 $('addPlan').onclick=()=>openPlan();$('reviewBtn').onclick=()=>openReview();$('refresh').onclick=refresh;
 addEventListener('hashchange',()=>{if(dimensions.some(d=>d.id===location.hash.slice(1))){selected=location.hash.slice(1);render();}});
 addEventListener('app-storage-change',render);
