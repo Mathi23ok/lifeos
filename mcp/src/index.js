@@ -7,7 +7,7 @@ import { toolDefinitions, executeTool } from './tools.js';
 try {
   const server = new McpServer({ name: 'lifeos', version: '1.0.0' });
   for (const definition of toolDefinitions(createClient())) {
-    // SDK receives the same schema used for argument validation, including refinements.
+    // Advertise object properties; executeTool also checks cross-field refinements.
     const jsonSchema = z.object({ data: z.unknown() });
     const inputSchema = definition.schema instanceof z.ZodEffects ? definition.schema.innerType() : definition.schema;
     server.registerTool(definition.name, { description: definition.description, inputSchema, outputSchema: jsonSchema, annotations: definition.annotations }, args => executeTool(definition, args));
