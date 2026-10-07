@@ -1,5 +1,5 @@
 import { remainingSeconds, nextMode } from './timer.mjs';
-import { mountDashboard, refreshDashboard } from './dashboard.js?v=weather-7d-1';
+import { mountDashboard, refreshDashboard } from './dashboard.js?v=habits-2';
 await window.appStorageReady;
 mountDashboard();
 const $=id=>document.getElementById(id);

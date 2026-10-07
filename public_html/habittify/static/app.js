@@ -32,6 +32,7 @@ const state = {
   habits: [],
   categories: [],
   logs: {},
+  recentLogs: {},
   activityLogs: {},
   activityRange: null,
   currentJ: null,
@@ -187,6 +188,39 @@ async function loadCategories() {
   state.categories = data.categories.map((category) => ({ ...category, id: Number(category.id) }));
 }
 
+async function loadRecentLogs() {
+  const end = new Date(), start = new Date(end);
+  start.setDate(start.getDate() - 6);
+  const data = await api(`/api/logs?start=${toISODate(start)}&end=${toISODate(end)}`);
+  state.recentLogs = data.logs || {};
+}
+
+function renderDailyProgress() {
+  const today = toISODate(new Date());
+  const doneIds = new Set((state.recentLogs[today] || []).map(Number));
+  const done = state.habits.filter(habit => doneIds.has(habit.id)).length;
+  const total = state.habits.length;
+  $('todayCount').textContent = `${done} / ${total} done`;
+  $('todayProgressFill').style.width = `${total ? done / total * 100 : 0}%`;
+  $('todayEncouragement').textContent = !total ? 'Start with one small habit.' : done === total ? 'Your daily practice is complete. Well done.' : done ? `${total - done} small step${total - done === 1 ? '' : 's'} left for today.` : 'A fresh start. Pick one habit to begin.';
+  let completed = 0, possible = 0, activeDays = 0;
+  const bars = [];
+  for (let offset = 6; offset >= 0; offset--) {
+    const date = new Date(); date.setDate(date.getDate() - offset);
+    const key = toISODate(date), ids = new Set((state.recentLogs[key] || []).map(Number));
+    const eligible = state.habits.filter(habit => !habit.created_at || habit.created_at.slice(0, 10) <= key);
+    const count = eligible.filter(habit => ids.has(habit.id)).length;
+    completed += count; possible += eligible.length; if (count) activeDays++;
+    const pct = eligible.length ? Math.round(count / eligible.length * 100) : 0;
+    const weekday = date.toLocaleDateString('en-US', {weekday:'short'});
+    bars.push(`<div class="week-day ${offset === 0 ? 'is-today' : ''}" title="${key}: ${count}/${eligible.length} completed"><div class="week-bar"><span style="height:${pct}%"></span></div><small>${weekday}</small></div>`);
+  }
+  $('weekBars').innerHTML = bars.join('');
+  $('weekCompletion').textContent = possible ? `${Math.round(completed / possible * 100)}%` : '—';
+  $('weekCheckins').textContent = completed;
+  $('weekActiveDays').textContent = `${activeDays} / 7`;
+}
+
 async function loadActivity() {
   const days = getMonthDays(state.currentJ.jy, state.currentJ.jm);
   const start = days[0].date;
@@ -206,6 +240,9 @@ function setDoneLocal(habitId, iso, done) {
   const list = new Set(state.logs[iso] || []);
   done ? list.add(habitId) : list.delete(habitId);
   state.logs[iso] = Array.from(list);
+  const recent = new Set(state.recentLogs[iso] || []);
+  done ? recent.add(habitId) : recent.delete(habitId);
+  state.recentLogs[iso] = Array.from(recent);
 }
 
 function renderHabitList() {
@@ -373,19 +410,20 @@ function renderTodayList() {
     `${todayJ.jd} ${JALALI_MONTHS[todayJ.jm - 1]} ${todayJ.jy}`;
 
   const list = $("todayList");
+  renderDailyProgress();
   if (!state.habits.length) {
-    list.innerHTML = `<div class="empty-state">No habits yet.</div>`;
+    list.innerHTML = `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><strong>Begin with something small</strong>Read one page. Take a short walk.<br>Create a habit you can repeat.</div>`;
     return;
   }
 
   list.innerHTML = state.habits
     .map((habit) => {
-      const done = isDone(habit.id, todayIso);
+      const done = (state.recentLogs[todayIso] || []).map(Number).includes(habit.id);
       return `
       <div class="today-item ${done ? "done" : ""}" data-today-habit="${habit.id}">
         <button class="today-check ${done ? "done" : ""}" data-toggle-today="${habit.id}" aria-label="${done ? "Uncheck" : "Complete"} ${escapeHtml(habit.name)} for today" aria-pressed="${done}">✓</button>
-        <span class="today-name">${escapeHtml(habit.name)}</span>
-        <span class="today-meta">${escapeHtml(habit.category || "")}</span>
+        <div><span class="today-name" dir="auto">${escapeHtml(habit.name)}</span><span class="today-meta">${escapeHtml(habit.category || "Daily practice")}</span></div>
+        <button class="icon-btn" data-edit-today="${habit.id}" aria-label="Edit ${escapeHtml(habit.name)}">⋯</button>
       </div>
     `;
     })
@@ -396,16 +434,21 @@ function renderTodayList() {
       toggleToday(Number(button.dataset.toggleToday)),
     );
   });
+  list.querySelectorAll('[data-edit-today]').forEach(button => button.addEventListener('click', () => openEditDialog(Number(button.dataset.editToday))));
 }
 
 async function toggleToday(habitId) {
   const todayIso = toISODate(new Date());
   const habit = state.habits.find((item) => item.id === habitId);
   if (!habit) return;
-  const data = await api("/api/logs/toggle", {
+  const button = document.querySelector(`[data-toggle-today="${habitId}"]`);
+  if (button?.disabled) return;
+  if (button) button.disabled = true;
+  let data;
+  try { data = await api("/api/logs/toggle", {
     method: "POST",
     body: JSON.stringify({ habit_id: habitId, date: todayIso }),
-  });
+  }); } catch (error) { showToast(error.message); if (button) button.disabled = false; return; }
   setDoneLocal(habitId, todayIso, data.done);
   renderTodayList();
   if (
@@ -492,36 +535,42 @@ function renderTable() {
 }
 
 async function toggleCell(button) {
+  if (button.disabled) return;
+  button.disabled = true;
   const habitId = Number(button.dataset.habit);
   const date = button.dataset.date;
   const habit = state.habits.find((item) => item.id === habitId);
-  const data = await api("/api/logs/toggle", {
+  let data;
+  try { data = await api("/api/logs/toggle", {
     method: "POST",
     body: JSON.stringify({ habit_id: habitId, date }),
-  });
+  }); } catch (error) { showToast(error.message); button.disabled = false; return; }
+  button.disabled = false;
   setDoneLocal(habitId, date, data.done);
   button.classList.toggle("done", data.done);
   button.setAttribute("aria-pressed", String(data.done));
   renderStats(getMonthDays(state.currentJ.jy, state.currentJ.jm));
   if (date === toISODate(new Date())) renderTodayList();
+  else renderDailyProgress();
   await loadActivity();
   renderActivityGrid();
 }
 
 function renderStats(days) {
   const activeIds = new Set(state.habits.map((h) => h.id));
-  const total = state.habits.length * days.length;
-  const done = days.reduce(
+  const today = toISODate(new Date());
+  const eligibleDays = days.filter(day => day.iso <= today);
+  const eligibleHabits = day => state.habits.filter(habit => !habit.created_at || habit.created_at.slice(0, 10) <= day.iso);
+  const total = eligibleDays.reduce((sum, day) => sum + eligibleHabits(day).length, 0);
+  const done = eligibleDays.reduce(
     (sum, day) =>
       sum +
-      (state.logs[day.iso] || []).filter((id) => activeIds.has(id)).length,
+      eligibleHabits(day).filter(habit => (state.logs[day.iso] || []).map(Number).includes(habit.id)).length,
     0,
   );
   const percent = total ? Math.round((done / total) * 100) : 0;
 
-  $("monthCompletionPill").textContent = `${percent}% complete`;
-  const today = toISODate(new Date());
-  const eligibleDays = days.filter((day) => day.iso <= today);
+  $("monthCompletionPill").textContent = eligibleDays.length ? `${percent}% · elapsed days` : 'Future month';
   const activeDays = eligibleDays.filter((day) =>
     (state.logs[day.iso] || []).some((id) => activeIds.has(id)),
   ).length;
@@ -592,7 +641,7 @@ function sanitizeColor() {
 
 async function refresh() {
   await Promise.all([loadHabits(), loadCategories()]);
-  await Promise.all([loadLogs(), loadActivity()]);
+  await Promise.all([loadLogs(), loadActivity(), loadRecentLogs()]);
   renderCategorySelect($("habitCategory"), "");
   renderCategoryList();
   renderHabitList();
@@ -602,11 +651,13 @@ async function refresh() {
 
 function bindEvents() {
   const focusAddHabit = () => {
+    $('addDialog').showModal();
     const input = $("habitName");
-    input.scrollIntoView({ behavior: "smooth", block: "center" });
-    input.focus({ preventScroll: true });
+    input.focus();
   };
   $("gridAddHabit").addEventListener("click", focusAddHabit);
+  $('closeAdd').addEventListener('click', () => $('addDialog').close());
+  $('cancelAdd').addEventListener('click', () => $('addDialog').close());
 
   $("prevMonth").addEventListener("click", async () => {
     state.currentJ = normalizeMonth(state.currentJ.jy, state.currentJ.jm - 1);
@@ -635,7 +686,10 @@ function bindEvents() {
     const nameInput = $("habitName");
     const name = nameInput.value.trim();
     if (!name) return;
-    await api("/api/habits", {
+    const submit = event.currentTarget.querySelector('[type="submit"]') || event.currentTarget.querySelector('.primary-btn');
+    if (submit.disabled) return;
+    submit.disabled = true;
+    try { await api("/api/habits", {
       method: "POST",
       body: JSON.stringify({
         name,
@@ -646,7 +700,10 @@ function bindEvents() {
     nameInput.value = "";
     $("habitCategory").value = "";
     await refresh();
+    $('addDialog').close();
     showToast("Habit added");
+    } catch (error) { showToast(error.message); }
+    finally { submit.disabled = false; }
   });
 
   $("categoryAddForm").addEventListener("submit", async (event) => {

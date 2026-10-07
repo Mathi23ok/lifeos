@@ -247,24 +247,26 @@ export async function refreshDashboard() {
   } catch {
     if (sequence !== refreshSequence) return;
   }
-  const habitIds = new Set(habits.map(h => h.id));
+  // MySQL returns habit IDs as strings while the logs API emits integers.
+  const habitIds = new Set(habits.map(h => String(h.id)));
   const totalHabits = habits.length;
+  const completedCount = key => new Set(safeArray(logs[key]).map(String).filter(id => habitIds.has(id))).size;
   const completion = (key) => {
     if (!totalHabits) return 0;
-    const done = (logs[key] || []).filter(id => habitIds.has(id)).length;
+    const done = completedCount(key);
     return done / totalHabits * 100;
   };
   const todayPct = completion(today);
-  const todayDone = (logs[today] || []).filter(id => habitIds.has(id)).length;
+  const todayDone = completedCount(today);
   let habitAvg = 0, habitPrev = 0;
   for (let i = 1; i <= 7; i++) habitAvg += completion(addDaysISO(today, -i));
   for (let i = 8; i <= 14; i++) habitPrev += completion(addDaysISO(today, -i));
   habitAvg /= 7; habitPrev /= 7;
   const habitPct = clamp(todayMin > 0 ? todayPct : habitAvg);
   renderMetricDelta('habit-delta', todayPct, habitAvg);
-  set('m-habits', number(todayDone));
-  set('m-habits-unit', `/ ${number(totalHabits)}`);
-  set('m-habits-foot', habitsOk ? `${number(Math.round(todayPct))}% of daily habits` : 'Open Habittify to view progress');
+  set('m-habits', habitsOk ? number(todayDone) : '—');
+  set('m-habits-unit', habitsOk ? `/ ${number(totalHabits)}` : '');
+  set('m-habits-foot', habitsOk ? `${number(Math.round(todayPct))}% of daily habits` : 'Unable to load habits. Refresh to retry.');
   animateFill('m-habits-track', todayPct);
   set('part-habits', `${number(Math.round(habitAvg))}%`);
   animateFill('fill-habits', habitAvg);
@@ -293,7 +295,9 @@ export async function refreshDashboard() {
   renderFocusChart(today, focusByDay, todaySessions, weekSessions);
 
   // ── habit chart (14 days) ──────────────────────────────────────────
-  renderHabitChart(today, completion, totalHabits, habitAvg);
+  let habit14Avg = 0;
+  for (let i = 0; i < 14; i++) habit14Avg += completion(addDaysISO(today, -i));
+  renderHabitChart(today, completion, totalHabits, habit14Avg / 14, habitsOk);
 
   // ── heatmap ────────────────────────────────────────────────────────
   renderHeatmap(today, completion, totalHabits, habitsOk);
@@ -407,9 +411,13 @@ function renderFocusChart(today, focusByDay) {
     </svg>` : `<div class="chart-empty rise">No focus sessions in the last 14 days.<br>Start one from the Focus app to see the curve grow.</div>`;
 }
 
-function renderHabitChart(today, completion, totalHabits, habitAvg) {
+function renderHabitChart(today, completion, totalHabits, habitAvg, habitsOk) {
   const wrap = $('habit-chart');
-  set('habit-14-avg', `${number(Math.round(habitAvg))}%`);
+  set('habit-14-avg', habitsOk ? `${number(Math.round(habitAvg))}%` : '—');
+  if (!habitsOk) {
+    wrap.innerHTML = '<div class="chart-empty">Unable to load habit completions.<br>Refresh the page to retry.</div>';
+    return;
+  }
   const days = [];
   for (let i = 13; i >= 0; i--) {
     const key = addDaysISO(today, -i);
@@ -446,9 +454,9 @@ function renderHeatmap(today, completion, totalHabits, habitsOk) {
   const edit = (key) => {
     const pct = completion(key);
     if (!pct) return 0;
-    if (pct >= 0.99) return 4;
-    if (pct >= 0.66) return 3;
-    if (pct >= 0.33) return 2;
+    if (pct >= 99) return 4;
+    if (pct >= 66) return 3;
+    if (pct >= 33) return 2;
     return 1;
   };
   let cells = '';
@@ -462,7 +470,7 @@ function renderHeatmap(today, completion, totalHabits, habitsOk) {
       cells += `<span class="heat-cell level-${level}${key === today ? ' today' : ''}" title="${key}: ${number(Math.round(completion(key)))}% complete"></span>`;
     }
   }
-  grid.innerHTML = habitsOk ? cells : `<div class="empty-sm" style="grid-column:1/-1">No habit data yet.</div>`;
+  grid.innerHTML = habitsOk ? cells : `<div class="empty-sm" style="grid-column:1/-1">Unable to load habit history. Refresh to retry.</div>`;
   set('heat-extra', made ? `${number(made)} strong days` : '');
 }
 
