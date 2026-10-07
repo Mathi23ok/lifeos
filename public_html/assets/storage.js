@@ -8,6 +8,8 @@
     'edi_kanban_theme', 'edi_goals_theme', 'edi_notes_theme'
   ];
   const cache = new Map();
+  const revisions = new Map();
+  const conflicts = new Set();
   let csrf = '';
   let writes = Promise.resolve();
   let errorShown = false;
@@ -19,25 +21,29 @@
     }
   };
 
-  function showError() {
+  function showError(conflict = false) {
     if (errorShown) return;
     errorShown = true;
     const message = document.createElement('div');
     message.setAttribute('role', 'alert');
-    message.textContent = 'Unable to save to MySQL. Check the server configuration or connection, then reload.';
+    message.textContent = conflict ? 'Data changed in another client. Your latest edits were not saved. Copy them, then reload before editing again.' : 'Unable to save to MySQL. Check the server configuration or connection, then reload.';
     Object.assign(message.style, {position:'fixed', bottom:'12px', left:'12px', right:'12px', zIndex:'9999', padding:'12px 16px', background:'#7f1d1d', color:'white', borderRadius:'8px'});
     if (document.body) document.body.append(message);
     else addEventListener('DOMContentLoaded', () => document.body.append(message), {once:true});
   }
 
   async function save(key, value) {
+    if (conflicts.has(key)) throw new Error('Reload before saving this document again.');
     const response = await fetch('/state.php', {
       method: 'PUT',
       redirect: 'error',
       headers: {'Content-Type':'application/json', 'X-CSRF-Token':csrf},
-      body: JSON.stringify({key, value})
+      body: JSON.stringify({key, value, revision:revisions.get(key) ?? null})
     });
-    if (!response.ok || !(await response.json()).ok) throw new Error(`MySQL save failed (${response.status})`);
+    if (response.status === 409) { conflicts.add(key); showError(true); throw new Error('State conflict: save stopped.'); }
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(`MySQL save failed (${response.status})`);
+    revisions.set(key, result.revision);
   }
 
   window.appStorage = {
@@ -57,6 +63,7 @@
     if (!response.ok) throw new Error(`MySQL load failed (${response.status})`);
     const payload = await response.json();
     csrf = payload.csrf;
+    for (const [key, revision] of Object.entries(payload.revisions || {})) revisions.set(key, revision);
     for (const [key, value] of Object.entries(payload.data || {})) {
       if (keys.includes(key) && typeof value === 'string') cache.set(key, value);
     }

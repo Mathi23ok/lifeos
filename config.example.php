@@ -9,4 +9,6 @@ return [
     'db_password' => 'your_database_password',
     'username' => 'your_app_username',
     'password' => 'your_app_password',
+    'api_token' => 'replace-with-a-long-random-token',
+    'api_allow_secret_notes' => false,
 ];

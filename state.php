@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/lib/state_store.php';
 life_os_require_auth();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -27,10 +28,14 @@ try {
     if ($method === 'GET') {
         $rows = $db->query('SELECT state_key, state_value FROM app_state')->fetchAll();
         $data = [];
-        foreach ($rows as $row) $data[$row['state_key']] = $row['state_value'];
+        $revisions = [];
+        foreach ($rows as $row) {
+            $data[$row['state_key']] = $row['state_value'];
+            $revisions[$row['state_key']] = hash('sha256', $row['state_value']);
+        }
         life_os_start_session();
         $_SESSION['state_csrf'] ??= bin2hex(random_bytes(32));
-        state_reply(['data' => $data, 'csrf' => $_SESSION['state_csrf']]);
+        state_reply(['data' => $data, 'revisions' => $revisions, 'csrf' => $_SESSION['state_csrf']]);
     }
     if ($method !== 'PUT') state_reply(['error' => 'Method not allowed'], 405);
     life_os_start_session();
@@ -44,9 +49,13 @@ try {
     $value = $payload['value'] ?? null;
     $isBackup = is_string($key) && preg_match('/^legacy_backup_[0-9a-f]{32}$/', $key);
     if (!is_string($key) || (!in_array($key, $allowed, true) && !$isBackup) || !is_string($value)) state_reply(['error' => 'Invalid data'], 400);
-    $statement = $db->prepare('INSERT INTO app_state (state_key, state_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE state_value = VALUES(state_value)');
-    $statement->execute([$key, $value]);
-    state_reply(['ok' => true]);
+    if (!array_key_exists('revision', $payload)) state_reply(['error' => 'Reload the app to use the current save protocol.'], 409);
+    $revision = $payload['revision'];
+    if ($revision !== null && (!is_string($revision) || !preg_match('/^[a-f0-9]{64}$/D', $revision))) state_reply(['error' => 'Invalid revision'], 400);
+    $newRevision = (new StateStore($db))->compareAndSwap($key, $value, $revision);
+    state_reply(['ok' => true, 'revision' => $newRevision]);
+} catch (ApiException $error) {
+    state_reply(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {
     error_log($error->__toString());
     state_reply(['error' => 'Database unavailable. Check config.php and MySQL.'], 503);

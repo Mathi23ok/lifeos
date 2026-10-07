@@ -4,3 +4,8 @@
 public_html/habittify/storage/*.db*
 edi-life-os-shared-host.zip
 /intro.gif
+node_modules/
+.env
+.env.*
+!.env.example
+/config.test.php

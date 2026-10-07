@@ -7,6 +7,11 @@ require_once __DIR__ . '/auth.php';
 $requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
 $relativePath = ltrim(rawurldecode($requestPath), '/');
 
+if (str_starts_with($requestPath, '/api/v1/')) {
+    require __DIR__ . '/api.php';
+    return true;
+}
+
 if ($relativePath === 'login.php') {
     require __DIR__ . '/login.php';
     return true;

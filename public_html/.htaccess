@@ -1,6 +1,7 @@
 Options -Indexes
 DirectoryIndex router.php
 RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^router\.php$ - [L]
 RewriteRule ^ router.php [L]
 <FilesMatch "^\.">
