@@ -15,8 +15,9 @@ Built with PHP, MySQL, and vanilla JavaScript. The browser application requires 
 | Workspace | What you can do |
 | --- | --- |
 | **Overview** | See focus activity, habit progress, goals, finances, and a seven-day weather forecast. |
+| **Growth** | Connect six life dimensions to long-term goals, existing SMART goals, habits and tasks. Track progress and complete weekly, monthly or quarterly reviews. |
 | **Focus** | Work in timed sessions with short and long breaks, progress tracking, and session history. |
-| **Finance** | Track expenses, income streams, and budgets in Toman, with searchable categories and period-based records. |
+| **Finance** | Track expenses, income streams, and budgets in Toman. Manage recurring payments, subscriptions, installments and debts with generated dues, transaction links and a monthly commitments dashboard. |
 | **Habittify** | Maintain daily habits and follow completion, streaks, and monthly progress. |
 | **Kanban** | Organize projects with draggable cards and lists, priorities, labels, dates, checklists, comments, and file attachments. Move cards between projects. |
 | **Calendar** | View due cards across all boards in Month or Schedule view, with search, board filters, and overdue items. |
@@ -26,6 +27,9 @@ Built with PHP, MySQL, and vanilla JavaScript. The browser application requires 
 | **Settings** | Change the theme and manage your sign-in credentials. |
 
 Calendar uses **Asia/Tehran** for dates and overdue status. Selecting an event opens its original Kanban card.
+Financial dues also appear in Calendar and open their payment in Finance. [Financial commitments](docs/financial-commitments.md) distinguishes optional subscription skips from unpaid debt deferrals and records payments atomically with ledger expenses.
+
+The [personal growth workspace](docs/growth.md) connects Religion & Spirituality, Health, Relationships & Family, Finance, Self Growth, and Fun & Rest. Existing Goals, Habittify and Kanban records remain the source of truth; connections and review snapshots are stored separately.
 
 The weather card shows current conditions and a seven-day forecast for Qeshm Island through Open-Meteo. Its tide information is a modeled coastal estimate and is unsuitable for navigation. Weather requires PHP cURL and outbound HTTPS access.
 

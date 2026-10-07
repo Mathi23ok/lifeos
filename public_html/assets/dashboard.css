@@ -318,3 +318,13 @@
 
 .kish-forecast-date{display:block;font:400 10px var(--font-mono);color:var(--text-tertiary);margin-top:4px}
 @media(max-width:650px){.kish-forecast-days{grid-template-columns:repeat(7,minmax(88px,1fr));overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent;scroll-snap-type:x proximity}.kish-forecast-day{scroll-snap-align:start;flex-wrap:nowrap;padding:12px 8px}}
+/* Growth summary uses the shared dashboard surfaces without changing app controls. */
+.growth-summary{margin-bottom:22px}
+.growth-summary .card-head>a{color:var(--accent);font-size:12px;text-decoration:none}
+.growth-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.growth-summary-grid a{padding:16px;border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:13px;line-height:1.5}
+.growth-summary-grid a:hover{background:var(--surface-2);border-color:var(--border-strong)}
+.growth-summary-grid small{display:block;margin-top:8px;color:var(--text-secondary);font-size:11px}
+.growth-summary #growthReviewHint{color:var(--text-secondary);font-size:12px;margin-top:16px}
+@media(max-width:650px){.growth-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:380px){.growth-summary-grid{grid-template-columns:1fr}}

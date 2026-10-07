@@ -1,5 +1,6 @@
 import { refreshWeatherCard } from './weather.js?v=weather-7d-1';
 import { remainingSeconds } from './timer.mjs';
+import { mountGrowthOverview, refreshGrowthOverview } from './growth-overview.js';
 
 const readJson = (key) => {
   try { return JSON.parse(appStorage.getItem(key) || 'null'); } catch { return null; }
@@ -56,7 +57,7 @@ function smoothPath(points) {
 export function mountDashboard() {
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
-  stylesheet.href = 'assets/dashboard.css?v=weather-7d-1';
+  stylesheet.href = 'assets/dashboard.css?v=growth-1';
   document.head.append(stylesheet);
   const nav = document.querySelector('.os-nav nav');
   const overview = document.createElement('a');
@@ -145,6 +146,7 @@ export function mountDashboard() {
     <p class="dash-privacy">Your data is saved in MySQL on this server.</p>`;
 
   document.getElementById('focus').before(main);
+  mountGrowthOverview(main);
   addEventListener('storage', () => { if (!main.hidden) refreshDashboard(); });
   addEventListener('app-storage-change', () => { if (!main.hidden) refreshDashboard(); });
   addEventListener('focus', () => { if (!main.hidden) { appStorage.sync(); refreshDashboard(); } });
@@ -260,6 +262,7 @@ export async function refreshDashboard() {
     if (sequence !== refreshSequence) return;
   }
   // MySQL returns habit IDs as strings while the logs API emits integers.
+  refreshGrowthOverview(habitsOk ? {habits, logs} : null);
   const habitIds = new Set(habits.map(h => String(h.id)));
   const totalHabits = habits.length;
   const completedCount = key => new Set(safeArray(logs[key]).map(String).filter(id => habitIds.has(id))).size;

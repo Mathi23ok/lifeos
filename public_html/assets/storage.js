@@ -3,7 +3,7 @@
 (() => {
   const keys = [
     'edi_focus_v1', 'daramd_periods_v1', 'daramd_active_period_v1', 'daramd_v1',
-    'kanban_boards_v1', 'edi_goals_v1', 'edi_goals_drafts_v1', 'edi_notes_v1', 'edi_notepad_v1',
+    'kanban_boards_v1', 'edi_goals_v1', 'edi_goals_drafts_v1', 'edi_notes_v1', 'edi_notepad_v1', 'edi_growth_v1', 'edi_obligations_v1',
     'edi_os_theme', 'edifinance_theme', 'habittify_theme',
     'edi_kanban_theme', 'edi_goals_theme', 'edi_notes_theme'
   ];
@@ -22,6 +22,16 @@
   let errorShown = false;
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel('edi-life-os-state') : null;
   if (channel) channel.onmessage = ({data}) => {
+    if (data?.updates && typeof data.updates === 'object') {
+      const entries = Object.entries(data.updates);
+      if (!entries.length || entries.some(([key, item]) => !keys.includes(key) || typeof item?.value !== 'string' || !/^[a-f0-9]{64}$/.test(item?.revision || '') || pending.has(key) || conflicts.has(key) || failedWrites.has(key))) return;
+      for (const [key, item] of entries) {
+        cache.set(key, item.value); revisions.set(key, item.revision);
+        edits.set(key, (edits.get(key) || 0) + 1);
+      }
+      dispatchEvent(new Event('app-storage-change'));
+      return;
+    }
     if (keys.includes(data?.key) && typeof data.value === 'string') {
       cache.set(data.key, data.value);
       dispatchEvent(new Event('app-storage-change'));
@@ -83,6 +93,28 @@
       writes = mutation.catch(error => {
         if (error.stateConflict) { conflicts.add(key); showError(true); }
       }).finally(() => track(key, -1));
+      return mutation;
+    },
+    // Multi-document backend mutations (a payment and its expense) share the
+    // same queue as ordinary saves and publish all returned documents together.
+    mutateItems(affectedKeys, operation) {
+      const affected = [...new Set(affectedKeys)];
+      if (!affected.length || affected.some(key => !keys.includes(key))) throw new Error('Unknown storage key');
+      affected.forEach(key => track(key, 1));
+      const mutation = writes.then(async () => {
+        if (affected.some(key => conflicts.has(key) || failedWrites.has(key))) throw new Error('Your latest edits could not be saved. Reload before recording a payment.');
+        const result = await operation({csrf, revisions:Object.fromEntries(affected.map(key => [key, revisions.get(key) ?? null]))});
+        const updates = result?.updates;
+        if (!updates || !Object.keys(updates).length || Object.entries(updates).some(([key, item]) => !affected.includes(key) || typeof item?.value !== 'string' || !/^[a-f0-9]{64}$/.test(item?.revision || ''))) throw new Error('Invalid save response. Reload before editing.');
+        for (const [key, item] of Object.entries(updates)) {
+          cache.set(key, item.value); revisions.set(key, item.revision);
+          edits.set(key, (edits.get(key) || 0) + 1);
+        }
+        channel?.postMessage({updates});
+        dispatchEvent(new Event('app-storage-change'));
+        return result;
+      });
+      writes = mutation.catch(error => { if (error.stateConflict) { affected.forEach(key => conflicts.add(key)); showError(true); } }).finally(() => affected.forEach(key => track(key, -1)));
       return mutation;
     },
     // Pull changes made by other devices or clients; the cache is otherwise

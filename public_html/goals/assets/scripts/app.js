@@ -894,4 +894,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   load();
   setupEventListeners();
   render();
+  const requestedGoal = new URLSearchParams(location.search).get('goal');
+  const linkedGoal = state.goals.find(goal => String(goal.id) === requestedGoal);
+  if (linkedGoal) openDetail(linkedGoal.id);
 });

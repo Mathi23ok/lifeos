@@ -55,7 +55,7 @@ final class StateStore
     }
 
     /** Lock all documents in key order, including missing rows, before mutating. */
-    public function mutate(array $defaults, callable $mutator): mixed
+    public function mutate(array $defaults, callable $mutator, ?array $expectedRevisions = null): mixed
     {
         ksort($defaults);
         $this->db->beginTransaction();
@@ -74,6 +74,10 @@ final class StateStore
                 $created[$key] = $insert->rowCount() === 1;
                 $select->execute([$key]);
                 $raw = (string) $select->fetchColumn();
+                if ($expectedRevisions !== null) {
+                    $actual = $created[$key] ? null : hash('sha256', $raw);
+                    if (!array_key_exists($key, $expectedRevisions) || $expectedRevisions[$key] !== $actual) throw new ApiException(409, 'state_conflict', 'Saved data changed elsewhere. Refresh before editing.');
+                }
                 $documents[$key] = $this->decode($raw, $default);
                 $initial[$key] = $documents[$key];
                 $originals[$key] = json_decode($raw, false, 64, JSON_THROW_ON_ERROR);
