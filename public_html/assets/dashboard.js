@@ -91,7 +91,7 @@ export function mountDashboard() {
         <p id="score-copy">A live composite of how your day is shaping up across focus, habits, goals and work.</p>
         <span class="score-grade">Grade: <em id="score-grade">—</em></span><span class="score-delta" id="score-delta"></span>
         <div class="score-parts" aria-label="Score breakdown">
-          <div class="score-part"><small>Focus</small><strong id="part-focus">0</strong><span class="part-track"><span class="part-fill" id="fill-focus"></span></span></div>
+          <div class="score-part" title="Today's focus time toward a 90-minute daily target"><small>Focus today</small><strong id="part-focus">0</strong><span class="part-track"><span class="part-fill" id="fill-focus"></span></span></div>
           <div class="score-part"><small>Habits</small><strong id="part-habits">0</strong><span class="part-track"><span class="part-fill" id="fill-habits"></span></span></div>
           <div class="score-part"><small>Goals</small><strong id="part-goals">0</strong><span class="part-track"><span class="part-fill" id="fill-goals"></span></span></div>
           <div class="score-part"><small>Work</small><strong id="part-work">0</strong><span class="part-track"><span class="part-fill" id="fill-work"></span></span></div>
@@ -198,7 +198,7 @@ export async function refreshDashboard() {
   const avgPrev = prevMin / 7;
   const todaySessions = history.filter(item => item?.day === today).length;
   const weekSessions = history.filter(item => { const k = item?.day; return k >= addDaysISO(today, -7) && k <= today; }).length;
-  const focusPct = clamp(avg7 / 90 * 100); // 90 focused minutes/day = full score
+  const focusPct = clamp(todayMin / 90 * 100); // Today's progress toward 90 focused minutes, including the current interval.
   renderMetricDelta('focus-delta', todayMin, avg7, 'min');
   set('m-focus', number(todayMin));
   set('m-focus-foot', `${number(todaySessions)} session${todaySessions === 1 ? '' : 's'} today${liveMin ? ` (+${number(liveMin)} min in progress)` : ''} · week avg ${number(Math.round(avg7))} min`);

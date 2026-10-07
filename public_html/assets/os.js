@@ -1,5 +1,5 @@
 import { remainingSeconds, nextMode } from './timer.mjs';
-import { mountDashboard, refreshDashboard } from './dashboard.js?v=focus-live-1';
+import { mountDashboard, refreshDashboard } from './dashboard.js?v=focus-today-2';
 import { mountMobileNavigation } from './mobile-nav.js?v=mobile-1';
 await window.appStorageReady;
 mountDashboard();
