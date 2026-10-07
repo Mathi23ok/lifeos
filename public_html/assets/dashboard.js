@@ -1,4 +1,5 @@
 import { refreshWeatherCard } from './weather.js?v=weather-7d-1';
+import { remainingSeconds } from './timer.mjs';
 
 const readJson = (key) => {
   try { return JSON.parse(appStorage.getItem(key) || 'null'); } catch { return null; }
@@ -146,7 +147,10 @@ export function mountDashboard() {
   document.getElementById('focus').before(main);
   addEventListener('storage', () => { if (!main.hidden) refreshDashboard(); });
   addEventListener('app-storage-change', () => { if (!main.hidden) refreshDashboard(); });
-  addEventListener('focus', () => { if (!main.hidden) refreshDashboard(); });
+  addEventListener('focus', () => { if (!main.hidden) { appStorage.sync(); refreshDashboard(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !main.hidden) { appStorage.sync(); refreshDashboard(); } });
+  // Keep in-progress focus time and other devices' changes current while open.
+  setInterval(() => { if (!document.hidden && !main.hidden) { appStorage.sync(); refreshDashboard(); } }, 60000);
 }
 
 let refreshSequence = 0;
@@ -171,6 +175,14 @@ export async function refreshDashboard() {
     const minutes = Number(item?.minutes) || 0;
     focusByDay[item.day] = (focusByDay[item.day] || 0) + minutes;
   }
+  // Count the running or paused focus interval so today's total moves before it completes.
+  let liveMin = 0;
+  const focusLength = Number(focus?.lengths?.focus) || 0;
+  if (focus?.mode === 'focus' && focusLength > 0) {
+    const timer = { deadline: null, remaining: focusLength * 60, ...focus };
+    liveMin = Math.max(0, Math.floor((focusLength * 60 - remainingSeconds(timer, Date.now())) / 60));
+    if (liveMin > 0) focusByDay[today] = (focusByDay[today] || 0) + liveMin;
+  }
 
   // ── focus: today, 7-day window, deltas ─────────────────────────────
   const todayMin = focusByDay[today] || 0;
@@ -189,7 +201,7 @@ export async function refreshDashboard() {
   const focusPct = clamp(avg7 / 90 * 100); // 90 focused minutes/day = full score
   renderMetricDelta('focus-delta', todayMin, avg7, 'min');
   set('m-focus', number(todayMin));
-  set('m-focus-foot', `${number(todaySessions)} session${todaySessions === 1 ? '' : 's'} today · week avg ${number(Math.round(avg7))} min`);
+  set('m-focus-foot', `${number(todaySessions)} session${todaySessions === 1 ? '' : 's'} today${liveMin ? ` (+${number(liveMin)} min in progress)` : ''} · week avg ${number(Math.round(avg7))} min`);
 
   // ── goals ──────────────────────────────────────────────────────────
   const goalsData = readJson('edi_goals_v1');

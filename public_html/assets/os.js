@@ -1,5 +1,6 @@
 import { remainingSeconds, nextMode } from './timer.mjs';
-import { mountDashboard, refreshDashboard } from './dashboard.js?v=habits-2';
+import { mountDashboard, refreshDashboard } from './dashboard.js?v=focus-live-1';
+import { mountMobileNavigation } from './mobile-nav.js?v=mobile-1';
 await window.appStorageReady;
 mountDashboard();
 const $=id=>document.getElementById(id);
@@ -14,16 +15,19 @@ addEventListener('message',event=>{
   frame.src=url.href;location.hash='#kanban';
 });
 document.querySelector('nav a[href="#notes"]')?.insertAdjacentHTML('beforebegin','<a href="#notepad"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 2v4m8-4v4M8 10h8m-8 4h8"/></svg> Notepad</a>');
+mountMobileNavigation();
 let data;try{data=JSON.parse(appStorage.getItem('edi_focus_v1'))}catch{}
 data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...data};
 let storageFailed=false;
+// Adopt focus state saved by another tab or device so the timer and Overview agree.
+addEventListener('app-storage-change',()=>{const raw=appStorage.getItem('edi_focus_v1');if(!raw||raw===JSON.stringify(data))return;let next;try{next=JSON.parse(raw)}catch{return}if(!next||typeof next!=='object')return;data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...next};for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];render()});
 function save(){try{appStorage.setItem('edi_focus_v1',JSON.stringify(data))}catch{if(!storageFailed){storageFailed=true;$('status').textContent='Unable to save focus data to the server.'}}}
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function applyTheme(theme){document.documentElement.dataset.theme=theme;try{for(const key of ['edi_os_theme','edifinance_theme','habittify_theme','edi_kanban_theme','edi_goals_theme','edi_notes_theme'])appStorage.setItem(key,theme)}catch{}for(const id of ['finance','habittify','kanban','calendar','goals','notes','notepad','settings']){const doc=$(id).contentDocument;if(doc)doc.documentElement.dataset.theme=theme}const sunIcon=document.querySelector('.sun-icon'),moonIcon=document.querySelector('.moon-icon');if(sunIcon&&moonIcon){sunIcon.style.display=theme==='dark'?'none':'block';moonIcon.style.display=theme==='dark'?'block':'none'}}
 let theme='dark';try{theme=appStorage.getItem('edi_os_theme')||appStorage.getItem('edifinance_theme')||theme}catch{}applyTheme(theme);
 $('theme').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 for(const id of ['finance','habittify','kanban','calendar','goals','notes','notepad','settings'])$(id).addEventListener('load',()=>{const root=$(id).contentDocument.documentElement;root.dataset.theme=document.documentElement.dataset.theme;new MutationObserver(()=>{if(root.dataset.theme!==document.documentElement.dataset.theme)applyTheme(root.dataset.theme)}).observe(root,{attributes:true,attributeFilter:['data-theme']})});
-function route(){const id=['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'dashboard';for(const key of ['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){$(key).hidden=key!==id;if(key===id&&$(key).dataset.src&&!$(key).getAttribute('src'))$(key).src=$(key).dataset.src}document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.hash==='#'+id?'page':'false'));document.title='Edi Life OS · '+(id==='dashboard'?'Overview':id[0].toUpperCase()+id.slice(1));if(id==='dashboard')refreshDashboard();if(id==='calendar')$('calendar').contentWindow?.postMessage({type:'calendar-refresh'},location.origin)}
+function route(){const id=['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'dashboard';for(const key of ['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){$(key).hidden=key!==id;if(key===id&&$(key).dataset.src&&!$(key).getAttribute('src'))$(key).src=$(key).dataset.src}document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.hash==='#'+id?'page':'false'));document.title='Edi Life OS · '+(id==='dashboard'?'Overview':id[0].toUpperCase()+id.slice(1));if(id==='dashboard'){appStorage.sync();refreshDashboard()}if(id==='calendar')$('calendar').contentWindow?.postMessage({type:'calendar-refresh'},location.origin)}
 addEventListener('hashchange',route);route();
 function render(){const seconds=remainingSeconds(data,Date.now());const label=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');$('clock').textContent=label;$('navTimer').textContent=data.deadline?label:'';$('start').textContent=data.deadline?'Pause':data.mode==='focus'?'Start focus':'Start break';$('cycle').textContent=`Session ${data.round%4+1} of 4`;document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===data.mode)));const today=data.history.filter(h=>h.day===day());$('completed').textContent=today.length;$('minutes').textContent=today.reduce((n,h)=>n+h.minutes,0);}
 function setMode(mode){data.mode=mode;data.deadline=null;data.remaining=data.lengths[mode]*60;save();render()}

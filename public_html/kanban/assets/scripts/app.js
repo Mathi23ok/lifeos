@@ -157,6 +157,19 @@ function setupEventListeners() {
     if (e.target === $('cardModal')) closeCardModal();
   });
   $('deleteCardBtn')?.addEventListener('click', deleteCurrentCard);
+  $('moveCardBtn').addEventListener('click', () => {
+    document.querySelector('.editor-more').open = false;
+    openMoveCard({...state.cardModal, fromEditor: true});
+  });
+  $('moveCardProject').addEventListener('change', renderMoveCardLists);
+  $('moveCardForm').addEventListener('submit', moveCardToProject);
+  ['closeMoveCard', 'cancelMoveCard'].forEach(id => $(id).addEventListener('click', () => {
+    if (!state.moveCard?.busy) $('moveCardModal').close();
+  }));
+  $('moveCardModal').addEventListener('click', event => {
+    if (event.target === $('moveCardModal') && !state.moveCard?.busy) $('moveCardModal').close();
+  });
+  $('moveCardModal').addEventListener('cancel', event => { if (state.moveCard?.busy) event.preventDefault(); });
   $('cardTitle')?.addEventListener('input', clearCardFormError);
   $('cardDescription')?.addEventListener('input', clearCardFormError);
   $('addLabelBtn')?.addEventListener('click', addBoardLabel);
@@ -268,6 +281,7 @@ function setupEventListeners() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if ($('moveCardModal').open) return;
       if ($('cardAttachMenu').matches(':popover-open')) { e.preventDefault(); $('cardAttachMenu').hidePopover(); return; }
       if ($('cardChecklistMenu').matches(':popover-open')) { e.preventDefault(); closeChecklistMenu(); return; }
       if ($('cardDatesMenu').matches(':popover-open')) { e.preventDefault(); closeCardDates(); return; }
@@ -808,7 +822,7 @@ function renderBoardContent() {
         <div class="card-header">
           <span class="priority-dot ${priorityClass}" role="img" aria-label="${priority} priority" title="${priority} priority"></span>
           <h3 class="card-title" contenteditable="false">${escapeHtml(card.title)}</h3>
-          <details class="card-menu"><summary aria-label="Card actions" title="Card actions">⋯</summary><div class="card-actions-menu"><button type="button" data-action="edit">Edit card</button><button type="button" data-action="delete" class="menu-danger">Delete card</button></div></details>
+          <details class="card-menu"><summary aria-label="Card actions" title="Card actions">⋯</summary><div class="card-actions-menu"><button type="button" data-action="edit">Edit card</button><button type="button" data-action="move">Move to another project</button><button type="button" data-action="delete" class="menu-danger">Delete card</button></div></details>
         </div>
         ${card.description ? `<p class="card-desc">${escapeHtml(card.description)}</p>` : ''}
         ${labelsHtml ? `<div class="card-meta"><div class="card-labels">${labelsHtml}</div></div>` : ''}
@@ -821,6 +835,10 @@ function renderBoardContent() {
       cardEl.querySelector('[data-action="edit"]').addEventListener('click', () => {
         cardEl.querySelector('.card-menu').open = false;
         openCardModal({ boardId: board.id, columnId: column.id, cardId: card.id });
+      });
+      cardEl.querySelector('[data-action="move"]').addEventListener('click', () => {
+        cardEl.querySelector('.card-menu').open = false;
+        openMoveCard({boardId: board.id, columnId: column.id, cardId: card.id, fromEditor: false});
       });
       cardEl.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1263,6 +1281,111 @@ function createCardChecklist() {
   const group = $('cardChecklist').lastElementChild;
   group.scrollIntoView({block: 'nearest'});
   group.querySelector('.checklist-open-add').click();
+}
+
+function openMoveCard(context) {
+  const card = getColumn(context.boardId, context.columnId)?.cards.find(item => item.id === context.cardId);
+  if (!card) return;
+  state.moveCard = {...context, busy: false};
+  $('moveCardSummary').textContent = card.title || 'Untitled card';
+  $('moveCardError').hidden = true;
+  const projects = state.boards.filter(board => board.id !== context.boardId);
+  $('moveCardProject').replaceChildren();
+  for (const project of projects) {
+    const option = document.createElement('option');
+    option.value = project.id;
+    option.textContent = project.name;
+    $('moveCardProject').append(option);
+  }
+  if (!projects.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No other projects yet';
+    $('moveCardProject').append(option);
+  }
+  ['closeMoveCard', 'cancelMoveCard'].forEach(id => { $(id).disabled = false; });
+  $('moveCardProject').disabled = !projects.length;
+  renderMoveCardLists();
+  $('moveCardModal').showModal();
+}
+
+function renderMoveCardLists() {
+  const project = getBoard($('moveCardProject').value);
+  const columns = project?.columns || [];
+  $('moveCardList').replaceChildren();
+  for (const column of columns) {
+    const option = document.createElement('option');
+    option.value = column.id;
+    option.textContent = column.name;
+    $('moveCardList').append(option);
+  }
+  if (!columns.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No lists available';
+    $('moveCardList').append(option);
+  }
+  const source = getColumn(state.moveCard.boardId, state.moveCard.columnId);
+  const similar = columns.find(column => column.name.trim().toLowerCase() === source?.name.trim().toLowerCase());
+  if (similar) $('moveCardList').value = similar.id;
+  $('moveCardList').disabled = !columns.length;
+  $('confirmMoveCard').disabled = !columns.length;
+  $('confirmMoveCard').textContent = 'Move card';
+  $('moveCardError').hidden = !!columns.length;
+  $('moveCardError').textContent = project ? 'Add a list to this project before moving a card.' : 'Create another project first, then move this card.';
+}
+
+async function moveCardToProject(event) {
+  event.preventDefault();
+  const context = state.moveCard;
+  if (!context || context.busy) return;
+  const destinationBoardId = $('moveCardProject').value;
+  const destinationColumnId = $('moveCardList').value;
+  if (!getColumn(destinationBoardId, destinationColumnId) || destinationBoardId === context.boardId) return;
+  if (context.fromEditor && $('cardModal').open) {
+    handleCardFormSubmit({preventDefault() {}});
+    if ($('cardModal').open) { $('moveCardModal').close(); $('cardTitle').focus(); return; }
+    context.fromEditor = false;
+  }
+  // Saving the editor may have changed the card's list within its current project.
+  const source = getBoard(context.boardId)?.columns.find(column => column.cards.some(card => card.id === context.cardId));
+  if (!source) { $('moveCardError').textContent = 'Card not found. Reload the board and try again.'; $('moveCardError').hidden = false; return; }
+  context.busy = true;
+  ['moveCardProject', 'moveCardList', 'confirmMoveCard', 'cancelMoveCard', 'closeMoveCard'].forEach(id => { $(id).disabled = true; });
+  $('confirmMoveCard').textContent = 'Moving…';
+  $('moveCardError').hidden = true;
+  try {
+    const value = await appStorage.mutateItem(KEY, async ({csrf, revision}) => {
+      const response = await fetch('/kanban.php', {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+        headers: {'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': csrf},
+        body: JSON.stringify({source_board_id: context.boardId, source_column_id: source.id, card_id: context.cardId, destination_board_id: destinationBoardId, destination_column_id: destinationColumnId, revision})
+      });
+      let payload;
+      try { payload = await response.json(); } catch { throw new Error('The server could not process the move. Please try again.'); }
+      if (!response.ok) {
+        const error = new Error(payload.error?.message || (typeof payload.error === 'string' ? payload.error : 'Unable to move the card. Please try again.'));
+        error.stateConflict = payload.error?.code === 'state_conflict';
+        throw error;
+      }
+      return payload.data;
+    });
+    const saved = JSON.parse(value);
+    state.boards = saved.boards;
+    state.activeBoardId = saved.activeBoardId;
+    $('moveCardModal').close();
+    render();
+    showToast(`Card moved to ${getBoard(destinationBoardId)?.name || 'project'}`, 'success');
+  } catch (error) {
+    $('moveCardError').textContent = ['TimeoutError', 'AbortError', 'TypeError'].includes(error.name)
+      ? 'The move could not be confirmed. Reload to check the card before trying again.'
+      : error.message || 'Unable to move the card.';
+    $('moveCardError').hidden = false;
+  } finally {
+    context.busy = false;
+    ['moveCardProject', 'moveCardList', 'confirmMoveCard', 'cancelMoveCard', 'closeMoveCard'].forEach(id => { $(id).disabled = false; });
+    $('confirmMoveCard').textContent = 'Move card';
+  }
 }
 
 function openCardModal({ boardId, columnId, cardId }) {

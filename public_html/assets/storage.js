@@ -10,6 +10,13 @@
   const cache = new Map();
   const revisions = new Map();
   const conflicts = new Set();
+  const failedWrites = new Set();
+  // Keys with in-flight writes, and a per-key edit counter, keep sync() from
+  // replacing local edits with an older server copy.
+  const pending = new Map();
+  const edits = new Map();
+  const track = (key, delta) => { const n = (pending.get(key) || 0) + delta; if (n > 0) pending.set(key, n); else pending.delete(key); };
+  let syncing = null;
   let csrf = '';
   let writes = Promise.resolve();
   let errorShown = false;
@@ -44,6 +51,7 @@
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(`MySQL save failed (${response.status})`);
     revisions.set(key, result.revision);
+    failedWrites.delete(key);
   }
 
   window.appStorage = {
@@ -52,9 +60,52 @@
       if (!keys.includes(key)) throw new Error('Unknown storage key');
       const text = String(value);
       cache.set(key, text);
+      edits.set(key, (edits.get(key) || 0) + 1);
+      track(key, 1);
       channel?.postMessage({key, value:text});
       dispatchEvent(new Event('app-storage-change'));
-      writes = writes.then(() => save(key, text)).catch(error => { console.error(error); showError(); });
+      writes = writes.then(() => save(key, text)).catch(error => { failedWrites.add(key); console.error(error); showError(); }).finally(() => track(key, -1));
+    },
+    mutateItem(key, operation) {
+      if (!keys.includes(key)) throw new Error('Unknown storage key');
+      track(key, 1);
+      const mutation = writes.then(async () => {
+        if (conflicts.has(key) || failedWrites.has(key)) throw new Error('Your latest edits could not be saved. Copy them and reload before moving the card.');
+        const result = await operation({csrf, revision:revisions.get(key) ?? null});
+        if (typeof result?.value !== 'string' || !/^[a-f0-9]{64}$/.test(result?.revision || '')) throw new Error('Invalid save response. Reload before editing again.');
+        cache.set(key, result.value);
+        revisions.set(key, result.revision);
+        edits.set(key, (edits.get(key) || 0) + 1);
+        channel?.postMessage({key, value:result.value});
+        dispatchEvent(new Event('app-storage-change'));
+        return result.value;
+      });
+      writes = mutation.catch(error => {
+        if (error.stateConflict) { conflicts.add(key); showError(true); }
+      }).finally(() => track(key, -1));
+      return mutation;
+    },
+    // Pull changes made by other devices or clients; the cache is otherwise
+    // only refreshed on page load.
+    sync() {
+      syncing ??= (async () => {
+        await window.appStorageReady;
+        const before = new Map(edits);
+        const response = await fetch('/state.php', {headers:{Accept:'application/json'}, cache:'no-store', redirect:'error'});
+        if (!response.ok) return;
+        const payload = await response.json();
+        let changed = false;
+        for (const [key, value] of Object.entries(payload.data || {})) {
+          const revision = payload.revisions?.[key];
+          if (!keys.includes(key) || typeof value !== 'string' || revision === revisions.get(key)) continue;
+          if (pending.has(key) || conflicts.has(key) || failedWrites.has(key) || edits.get(key) !== before.get(key)) continue;
+          cache.set(key, value);
+          revisions.set(key, revision);
+          changed = true;
+        }
+        if (changed) dispatchEvent(new Event('app-storage-change'));
+      })().catch(error => console.error(error)).finally(() => { syncing = null; });
+      return syncing;
     }
   };
 
