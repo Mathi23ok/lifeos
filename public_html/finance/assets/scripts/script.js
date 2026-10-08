@@ -698,6 +698,7 @@ function saveNewIncome() {
 }
 
 function deleteIncome(id) {
+  if (protectLinkedExpense(id, 'income')) return;
   state.incomes = state.incomes.filter((i) => i.id !== id);
   save();
   render();
@@ -871,6 +872,7 @@ function saveEditedBudget(id) {
 }
 
 function saveEditedIncome(id) {
+  if (protectLinkedExpense(id, 'income')) return;
   const name = document.getElementById("editIncomeName").value.trim();
   const amount = parseFloat(document.getElementById("editIncomeAmount").value);
   if (!name || isNaN(amount) || amount <= 0)
@@ -904,12 +906,15 @@ function saveEditedExpense(id) {
 }
 
 // ── CONTEXT MENU ──────────────────────────────────────────────────────────────
-function protectLinkedExpense(id) {
+function protectLinkedExpense(id, kind = 'expense') {
   try {
     const decisions = JSON.parse(appStorage.getItem('edi_obligations_v1') || '{}').decisions || {};
-    const linked = Object.entries(decisions).find(([, payment]) => payment.status === 'paid' && payment.period === activePeriod && payment.expenseId === String(id));
+    const key = kind === 'income' ? 'incomeId' : 'expenseId';
+    const linked = Object.entries(decisions).find(([, payment]) => payment.status === 'paid' && payment.period === activePeriod && payment[key] === String(id));
     if (!linked) return false;
-    showToast('This expense is linked to a scheduled payment. Undo the payment in Financial commitments before changing it.', 'error');
+    showToast(kind === 'income'
+      ? 'This income records money owed to you. Undo the receipt in Debts & credits before changing it.'
+      : 'This expense records a scheduled payment. Undo the payment in Debts & credits before changing it.', 'error');
     dispatchEvent(new CustomEvent('finance-open-payment', {detail:{id:linked[0]}}));
     return true;
   } catch {
@@ -1162,6 +1167,7 @@ function openEditBudgetModal(id) {
 }
 
 function openEditIncomeModal(id) {
+  if (protectLinkedExpense(id, 'income')) return;
   const inc = state.incomes.find((i) => i.id === id);
   if (!inc) return;
   openModal(`
@@ -1240,7 +1246,7 @@ function render() {
       : state.incomes
           .map(
             (inc) => `
-      <div class="fade-in row-item income-stream-row" onclick="showContextMenu(event,'income','${inc.id}')">
+      <div class="fade-in row-item income-stream-row" data-income-id="${esc(inc.id)}" onclick="showContextMenu(event,'income','${inc.id}')">
         <span class="income-stream-name" dir="auto">${esc(inc.name)}</span>
         <span class="num income-stream-amount">${fmt(inc.amount)}</span>
         <button type="button" class="expense-menu-button" aria-label="${esc('Income actions')}" onclick="showContextMenu(event,'income','${inc.id}')">⋯</button>

@@ -58,7 +58,7 @@ Most of us run our lives across a to-do app, a habit tracker, a budgeting spread
 | **Overview** | A live productivity score, focus and habit trends, goals, finances and a seven-day weather forecast. |
 | **Growth** | Connect six life dimensions to long-term goals, SMART goals, habits and tasks. Run weekly, monthly or quarterly reviews. [Guide](docs/growth.md) |
 | **Focus** | Timed sessions with short and long breaks, session history and a focus soundtrack. |
-| **Finance** | Expenses, income and budgets in Toman. Recurring payments, subscriptions, installments and debts with a monthly commitments view. [Guide](docs/financial-commitments.md) |
+| **Finance** | Expenses, income and budgets in Toman. Debts you owe and credits owed to you, one-time or recurring, recorded straight into the ledger. [Guide](docs/financial-commitments.md) |
 | **Habittify** | Daily habits with completion, streaks and monthly progress. |
 | **Kanban** | Draggable cards and lists with priorities, labels, dates, checklists, comments and file attachments. |
 | **Calendar** | Due cards and financial dues across all boards in Month or Schedule view. |
@@ -201,7 +201,7 @@ Built with PHP, MySQL and vanilla JavaScript — no frontend build step, no fram
 - [MCP guide](mcp/README.md) — tools, environment settings and client setup
 - [Deployment guide](docs/deployment.md) — Apache, shared hosting, backups and migration
 - [Development guide](docs/development.md) — local checks and disposable integration fixtures
-- [Growth workspace](docs/growth.md) · [Financial commitments](docs/financial-commitments.md)
+- [Growth workspace](docs/growth.md) · [Debts and credits](docs/financial-commitments.md)
 
 ## Contributing
 

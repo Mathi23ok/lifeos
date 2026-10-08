@@ -7,9 +7,18 @@ require_once __DIR__ . '/finance.php';
 const OBLIGATIONS_KEY = 'edi_obligations_v1';
 function obligations_default(): array { return ['version' => 1, 'plans' => [], 'decisions' => []]; }
 
+// Debts are paid out as expenses; credits (money owed to you) arrive as income.
+// Plans created before directions existed are debts.
+function obligation_direction(array $plan): string { return ($plan['direction'] ?? 'debt') === 'credit' ? 'credit' : 'debt'; }
+function obligation_ledger(array $plan): string { return obligation_direction($plan) === 'credit' ? 'incomes' : 'expenses'; }
+function obligation_entry_id(array $decision): string { return (string) ($decision['incomeId'] ?? $decision['expenseId'] ?? ''); }
+// The store keeps an emptied JSON object as {} (stdClass); decisions are always read as an array.
+function obligation_doc(array $doc): array { if (($doc['decisions'] ?? null) instanceof stdClass) $doc['decisions'] = (array) $doc['decisions']; return $doc; }
+function obligation_totals(): array { return ['scheduled' => 0, 'committed' => 0, 'paid' => 0, 'remaining' => 0, 'skipped' => 0, 'overdue' => 0, 'carryOver' => 0]; }
+
 function obligation_audit(array &$doc, string $action, string $id, array $before, array $after): void
 {
-    $doc['history'][] = ['id' => api_uuid(), 'action' => $action, 'occurrenceId' => $id, 'at' => api_now(), 'from' => $before['status'] ?? 'pending', 'to' => $after['status'] ?? 'pending', 'period' => $after['period'] ?? $before['period'] ?? null, 'expenseId' => $after['expenseId'] ?? $before['expenseId'] ?? null, 'note' => $after['note'] ?? ''];
+    $doc['history'][] = ['id' => api_uuid(), 'action' => $action, 'occurrenceId' => $id, 'at' => api_now(), 'from' => $before['status'] ?? 'pending', 'to' => $after['status'] ?? 'pending', 'period' => $after['period'] ?? $before['period'] ?? null, 'expenseId' => $after['expenseId'] ?? $before['expenseId'] ?? null, 'incomeId' => $after['incomeId'] ?? $before['incomeId'] ?? null, 'note' => $after['note'] ?? ''];
 }
 
 function obligation_integer(mixed $value, string $field, int $min, int $max): int
@@ -44,21 +53,23 @@ function obligation_record(array $plan, int $index, array $decisions, array $per
     $status = $decision['status'] ?? 'pending';
     $paymentIssue = false;
     if ($status === 'paid') {
-        $expense = null;
-        foreach ($periods[$decision['period'] ?? '']['expenses'] ?? [] as $entry) if ((string) $entry['id'] === ($decision['expenseId'] ?? '')) { $expense = $entry; break; }
-        $paymentIssue = !$expense || (float) $expense['amount'] !== (float) $amount;
+        $linked = null;
+        foreach ($periods[$decision['period'] ?? ''][obligation_ledger($plan)] ?? [] as $entry) if ((string) $entry['id'] === obligation_entry_id($decision)) { $linked = $entry; break; }
+        $paymentIssue = !$linked || (float) $linked['amount'] !== (float) $amount;
         if ($paymentIssue) $status = 'pending';
     }
     $skipped = $status === 'rejected' && $plan['optional'];
     $due = obligation_due($plan, $index);
-    return ['id' => $id, 'planId' => $plan['id'], 'index' => $index, 'count' => $plan['count'], 'title' => $plan['title'], 'type' => $plan['type'], 'optional' => $plan['optional'], 'payee' => $plan['payee'], 'amount' => $amount, 'date' => $due, 'status' => $status, 'skipped' => $skipped, 'overdue' => !$skipped && $status !== 'paid' && $due < api_today(), 'paymentIssue' => $paymentIssue, 'decision' => $decision];
+    return ['id' => $id, 'planId' => $plan['id'], 'index' => $index, 'count' => $plan['count'], 'title' => $plan['title'], 'type' => $plan['type'], 'direction' => obligation_direction($plan), 'frequency' => $plan['frequency'], 'interval' => $plan['interval'], 'optional' => $plan['optional'], 'payee' => $plan['payee'], 'amount' => $amount, 'date' => $due, 'status' => $status, 'skipped' => $skipped, 'overdue' => !$skipped && $status !== 'paid' && $due < api_today(), 'paymentIssue' => $paymentIssue, 'decision' => $decision];
 }
 
 function obligation_view(array $doc, array $periods, string $start, string $end): array
 {
+    $doc = obligation_doc($doc);
     $occurrences = [];
-    $totals = ['scheduled' => 0, 'committed' => 0, 'paid' => 0, 'remaining' => 0, 'skipped' => 0, 'overdue' => 0, 'carryOver' => 0];
+    $byDirection = ['debt' => obligation_totals(), 'credit' => obligation_totals()];
     foreach ($doc['plans'] as $plan) {
+        $totals =& $byDirection[obligation_direction($plan)];
         for ($index = 0; $index < ($plan['count'] ?? 20000); $index++) {
             $due = obligation_due($plan, $index);
             if ($due > $end) break;
@@ -77,6 +88,7 @@ function obligation_view(array $doc, array $periods, string $start, string $end)
             if ($item['status'] === 'paid') $totals['paid'] += $item['amount'];
             else { $totals['remaining'] += $item['amount']; if ($item['overdue']) $totals['overdue'] += $item['amount']; }
         }
+        unset($totals);
     }
     usort($occurrences, fn ($a, $b) => strcmp($a['date'] . $a['id'], $b['date'] . $b['id']));
     $plans = $doc['plans'];
@@ -90,29 +102,40 @@ function obligation_view(array $doc, array $periods, string $start, string $end)
         $plan['progress'] = ['paid' => $paid, 'remaining' => $plan['totalAmount'] - $paid, 'paidCount' => $paidCount];
     }
     unset($plan);
-    return ['plans' => $plans, 'occurrences' => $occurrences, 'totals' => $totals, 'history' => array_slice($doc['history'] ?? [], -30), 'start' => $start, 'end' => $end];
+    foreach ($plans as &$plan) $plan['direction'] = obligation_direction($plan);
+    unset($plan);
+    // `totals` keeps its original meaning (debts) for existing clients.
+    return ['plans' => $plans, 'occurrences' => $occurrences, 'totals' => $byDirection['debt'], 'creditTotals' => $byDirection['credit'], 'history' => array_slice($doc['history'] ?? [], -30), 'start' => $start, 'end' => $end];
 }
 
 function obligation_new_plan(array $body): array
 {
-    api_fields($body, ['title', 'payee', 'type', 'optional', 'amount', 'totalAmount', 'count', 'startDate', 'endDate', 'frequency', 'interval', 'notes']);
-    $type = api_enum($body['type'] ?? null, 'type', ['recurring', 'installment', 'debt']);
+    api_fields($body, ['title', 'payee', 'type', 'direction', 'optional', 'amount', 'totalAmount', 'count', 'startDate', 'endDate', 'frequency', 'interval', 'notes']);
+    $direction = api_enum($body['direction'] ?? 'debt', 'direction', ['debt', 'credit']);
+    $type = api_enum($body['type'] ?? null, 'type', ['once', 'recurring', 'installment', 'debt']);
+    if ($type === 'once') {
+        // A single due: one finite payment of the full amount.
+        $body['count'] = 1;
+        $body['totalAmount'] = $body['totalAmount'] ?? $body['amount'] ?? null;
+        $body['endDate'] = null;
+    }
     $start = api_date($body['startDate'] ?? null, 'startDate');
     $end = api_date($body['endDate'] ?? null, 'endDate');
     if (!$start || $start < '2000-01-01' || $start > (new DateTimeImmutable(api_today()))->modify('+5 years')->format('Y-m-d') || ($end && $end < $start)) throw new ApiException(422, 'validation_error', 'Choose a valid start date (2000 or later, up to five years ahead) and an end date after it.');
     $count = ($body['count'] ?? null) === null ? null : obligation_integer($body['count'], 'count', 1, 600);
-    if ($type !== 'recurring' && !$count) throw new ApiException(422, 'validation_error', 'Debts and installments need a finite payment count.');
+    if ($type !== 'recurring' && !$count) throw new ApiException(422, 'validation_error', 'Split payments need a finite payment count.');
     $optional = api_bool($body['optional'] ?? false, 'optional');
-    if ($optional && $type !== 'recurring') throw new ApiException(422, 'validation_error', 'Only recurring subscriptions can be optional.');
+    if ($optional && ($type !== 'recurring' || $direction !== 'debt')) throw new ApiException(422, 'validation_error', 'Only recurring payments you owe can be optional.');
     $amount = $type === 'recurring' ? obligation_integer($body['amount'] ?? null, 'amount', 1, 1000000000000) : 0;
     $total = $type !== 'recurring' ? obligation_integer($body['totalAmount'] ?? null, 'totalAmount', $count, 1000000000000) : null;
-    $plan = ['id' => api_uuid(), 'title' => api_text($body['title'] ?? '', 'title', 180, true), 'payee' => api_text($body['payee'] ?? '', 'payee', 180), 'type' => $type, 'optional' => $optional, 'amount' => $amount, 'totalAmount' => $total, 'count' => $count, 'startDate' => $start, 'endDate' => $end, 'frequency' => api_enum($body['frequency'] ?? 'monthly', 'frequency', ['daily', 'weekly', 'monthly', 'yearly']), 'interval' => obligation_integer($body['interval'] ?? 1, 'interval', 1, 12), 'notes' => api_text($body['notes'] ?? '', 'notes', 3000), 'createdAt' => api_now(), 'cancelFrom' => null];
-    if ($type !== 'recurring' && $end && $end < obligation_due($plan, $count - 1)) throw new ApiException(422, 'validation_error', 'An end date cannot remove debt installments.');
+    $plan = ['id' => api_uuid(), 'title' => api_text($body['title'] ?? '', 'title', 180, true), 'payee' => api_text($body['payee'] ?? '', 'payee', 180), 'type' => $type, 'direction' => $direction, 'optional' => $optional, 'amount' => $amount, 'totalAmount' => $total, 'count' => $count, 'startDate' => $start, 'endDate' => $end, 'frequency' => api_enum($body['frequency'] ?? 'monthly', 'frequency', ['daily', 'weekly', 'monthly', 'yearly']), 'interval' => obligation_integer($body['interval'] ?? 1, 'interval', 1, 12), 'notes' => api_text($body['notes'] ?? '', 'notes', 3000), 'createdAt' => api_now(), 'cancelFrom' => null];
+    if ($type !== 'recurring' && $end && $end < obligation_due($plan, $count - 1)) throw new ApiException(422, 'validation_error', 'An end date cannot remove scheduled payments.');
     return $plan;
 }
 
 function obligation_find(array $doc, mixed $id, array $periods): array
 {
+    $doc = obligation_doc($doc);
     if (!is_string($id) || !preg_match('/^([a-f0-9-]{36}):([0-9]{1,5})$/D', $id, $match)) throw new ApiException(422, 'validation_error', 'Invalid occurrence.');
     foreach ($doc['plans'] as $plan) if ($plan['id'] === $match[1]) {
         $index = (int) $match[2];
@@ -125,12 +148,13 @@ function obligation_find(array $doc, mixed $id, array $periods): array
 
 function obligation_mutate(StateStore $store, array $body): array
 {
-    api_fields($body, ['action', 'plan', 'planId', 'occurrenceId', 'cancelFrom', 'period', 'categoryId', 'expenseId', 'paymentDate', 'note', 'revisions']);
-    $action = api_enum($body['action'] ?? null, 'action', ['create', 'cancel', 'pay', 'undo', 'reject', 'restore']);
+    api_fields($body, ['action', 'plan', 'planId', 'occurrenceId', 'cancelFrom', 'period', 'categoryId', 'expenseId', 'incomeId', 'paymentDate', 'note', 'revisions']);
+    $action = api_enum($body['action'] ?? null, 'action', ['create', 'update', 'delete', 'cancel', 'pay', 'undo', 'reject', 'restore']);
     $financial = in_array($action, ['pay', 'undo'], true);
     $defaults = [OBLIGATIONS_KEY => obligations_default()];
     if ($financial) $defaults += [FINANCE_KEY => [], FINANCE_LEGACY_KEY => finance_default()];
     $result = $store->mutate($defaults, function (array &$docs) use ($store, $body, $action, $financial): array {
+        $docs[OBLIGATIONS_KEY] = obligation_doc($docs[OBLIGATIONS_KEY]);
         $doc =& $docs[OBLIGATIONS_KEY];
         if ($doc['version'] !== 1 || !is_array($doc['plans']) || !is_array($doc['decisions'])) throw new ApiException(409, 'invalid_document', 'Unable to read obligations.');
         if ($action === 'create') {
@@ -140,11 +164,35 @@ function obligation_mutate(StateStore $store, array $body): array
             $doc['plans'][] = $plan;
             return $plan;
         }
+        if ($action === 'update') {
+            // Only descriptive fields change; amounts and dates stay fixed so past dues keep their meaning.
+            if (!is_array($body['plan'] ?? null)) throw new ApiException(422, 'validation_error', 'plan must be an object.');
+            api_fields($body['plan'], ['title', 'payee', 'notes']);
+            foreach ($doc['plans'] as &$plan) if ($plan['id'] === ($body['planId'] ?? null)) {
+                $plan['title'] = api_text($body['plan']['title'] ?? $plan['title'], 'title', 180, true);
+                $plan['payee'] = api_text($body['plan']['payee'] ?? $plan['payee'], 'payee', 180);
+                $plan['notes'] = api_text($body['plan']['notes'] ?? $plan['notes'], 'notes', 3000);
+                return $plan;
+            }
+            throw new ApiException(404, 'not_found', 'Plan not found.');
+        }
+        if ($action === 'delete') {
+            // Deleting is for mistakes; anything already recorded in the ledger must be undone first.
+            foreach ($doc['plans'] as $index => $plan) if ($plan['id'] === ($body['planId'] ?? null)) {
+                $prefix = $plan['id'] . ':';
+                foreach ($doc['decisions'] as $id => $decision) if (str_starts_with((string) $id, $prefix) && ($decision['status'] ?? '') === 'paid') throw new ApiException(409, 'has_payments', 'Undo recorded payments before deleting this plan.');
+                foreach (array_keys($doc['decisions']) as $id) if (str_starts_with((string) $id, $prefix)) unset($doc['decisions'][$id]);
+                array_splice($doc['plans'], $index, 1);
+                obligation_audit($doc, 'delete', $prefix . '0', [], ['status' => 'deleted', 'note' => $plan['title']]);
+                return ['deleted' => $plan['id']];
+            }
+            throw new ApiException(404, 'not_found', 'Plan not found.');
+        }
         if ($action === 'cancel') {
             $date = api_date($body['cancelFrom'] ?? api_today(), 'cancelFrom');
             if (!$date || $date < api_today()) throw new ApiException(422, 'validation_error', 'Stop date must be today or later. Past dues cannot be removed.');
             foreach ($doc['plans'] as &$plan) if ($plan['id'] === ($body['planId'] ?? null)) {
-                if ($plan['type'] !== 'recurring') throw new ApiException(422, 'validation_error', 'Debt and installment schedules cannot be cancelled.');
+                if ($plan['type'] !== 'recurring') throw new ApiException(422, 'validation_error', 'Fixed schedules cannot be stopped. Defer individual dues instead.');
                 $plan['cancelFrom'] = $date;
                 return $plan;
             }
@@ -154,6 +202,9 @@ function obligation_mutate(StateStore $store, array $body): array
         $item = obligation_find($doc, $body['occurrenceId'] ?? null, $periods);
         $id = $item['id'];
         $previous = $doc['decisions'][$id] ?? [];
+        $credit = $item['direction'] === 'credit';
+        $ledger = $credit ? 'incomes' : 'expenses';
+        $entryKey = $credit ? 'incomeId' : 'expenseId';
         if (in_array($action, ['reject', 'restore'], true)) {
             if (($previous['status'] ?? '') === 'paid') throw new ApiException(409, 'already_paid', 'Undo the payment before changing its status.');
             $doc['decisions'][$id] = ['status' => $action === 'reject' ? 'rejected' : 'pending', 'note' => api_text($body['note'] ?? '', 'note', 1000), 'updatedAt' => api_now()];
@@ -162,9 +213,9 @@ function obligation_mutate(StateStore $store, array $body): array
         }
         if ($action === 'undo') {
             if (($previous['status'] ?? '') !== 'paid') throw new ApiException(409, 'not_paid', 'This payment is not marked paid.');
-            if (($previous['createdExpense'] ?? false) && isset($periods[$previous['period']]['expenses'])) {
-                $entries =& $periods[$previous['period']]['expenses'];
-                foreach ($entries ?? [] as $index => $entry) if ((string) $entry['id'] === $previous['expenseId']) {
+            if (($previous['createdExpense'] ?? false) && isset($periods[$previous['period']][$ledger])) {
+                $entries =& $periods[$previous['period']][$ledger];
+                foreach ($entries ?? [] as $index => $entry) if ((string) $entry['id'] === obligation_entry_id($previous)) {
                     // Preserve manual changes/imported replacements. Only an
                     // unchanged expense owned by this payment is removed.
                     if ($entry == $previous['expenseSnapshot']) array_splice($entries, $index, 1);
@@ -178,20 +229,23 @@ function obligation_mutate(StateStore $store, array $body): array
             if (!isset($periods[$period])) throw new ApiException(422, 'validation_error', 'Choose an existing finance period.');
             $date = api_date($body['paymentDate'] ?? api_today(), 'paymentDate');
             if (!$date || $date > api_today()) throw new ApiException(422, 'validation_error', 'Payment date must be today or earlier.');
-            $expenseId = api_text($body['expenseId'] ?? '', 'expenseId', 128);
-            $created = $expenseId === '';
-            $expense = null;
+            $linkId = api_text($body[$entryKey] ?? '', $entryKey, 128);
+            $created = $linkId === '';
+            $entry = null;
             if (!$created) {
-                foreach ($doc['decisions'] as $other) if (($other['status'] ?? '') === 'paid' && ($other['period'] ?? '') === $period && ($other['expenseId'] ?? '') === $expenseId) throw new ApiException(409, 'expense_linked', 'This expense is already linked to a payment.');
-                foreach ($periods[$period]['expenses'] ?? [] as $entry) if ((string) $entry['id'] === $expenseId) $expense = $entry;
-                if (!$expense || (float) $expense['amount'] !== (float) $item['amount']) throw new ApiException(422, 'validation_error', 'Choose an expense with the exact payment amount.');
+                foreach ($doc['decisions'] as $other) if (($other['status'] ?? '') === 'paid' && ($other['period'] ?? '') === $period && ($other[$entryKey] ?? '') === $linkId) throw new ApiException(409, 'entry_linked', $credit ? 'This income is already linked to a payment.' : 'This expense is already linked to a payment.');
+                foreach ($periods[$period][$ledger] ?? [] as $candidate) if ((string) $candidate['id'] === $linkId) $entry = $candidate;
+                if (!$entry || (float) $entry['amount'] !== (float) $item['amount']) throw new ApiException(422, 'validation_error', $credit ? 'Choose an income with the exact amount.' : 'Choose an expense with the exact payment amount.');
+            } elseif ($credit) {
+                $entry = ['id' => api_uuid(), 'name' => $item['title'] . ' · due ' . $item['date'], 'amount' => $item['amount'], 'dateISO' => $date, 'obligationId' => $id];
+                $periods[$period]['incomes'][] = $entry;
             } else {
                 $category = api_text($body['categoryId'] ?? '', 'categoryId', 128, true);
                 if (!in_array($category, array_map('strval', array_column($periods[$period]['categories'] ?? [], 'id')), true)) throw new ApiException(422, 'validation_error', 'Choose a category in the selected period.');
-                $expense = ['id' => api_uuid(), 'categoryId' => $category, 'desc' => $item['title'] . ' · due ' . $item['date'], 'amount' => $item['amount'], 'date' => (new DateTimeImmutable($date))->format('M j'), 'dateISO' => $date, 'obligationId' => $id];
-                $periods[$period]['expenses'][] = $expense;
+                $entry = ['id' => api_uuid(), 'categoryId' => $category, 'desc' => $item['title'] . ' · due ' . $item['date'], 'amount' => $item['amount'], 'date' => (new DateTimeImmutable($date))->format('M j'), 'dateISO' => $date, 'obligationId' => $id];
+                $periods[$period]['expenses'][] = $entry;
             }
-            $doc['decisions'][$id] = ['status' => 'paid', 'period' => $period, 'expenseId' => (string) $expense['id'], 'createdExpense' => $created, 'expenseSnapshot' => $expense, 'paymentDate' => $date, 'note' => api_text($body['note'] ?? '', 'note', 1000), 'updatedAt' => api_now()];
+            $doc['decisions'][$id] = ['status' => 'paid', 'period' => $period, $entryKey => (string) $entry['id'], 'createdExpense' => $created, 'expenseSnapshot' => $entry, 'paymentDate' => $date, 'note' => api_text($body['note'] ?? '', 'note', 1000), 'updatedAt' => api_now()];
         }
         obligation_audit($doc, $action, $id, $previous, $doc['decisions'][$id]);
         $docs[FINANCE_KEY] = $periods;
