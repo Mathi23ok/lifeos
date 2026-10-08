@@ -1,3 +1,4 @@
+import { mountFocusAudio } from './focus-audio.js?v=playlist-1';
 import { remainingSeconds, nextMode } from './timer.mjs';
 import { mountDashboard, refreshDashboard } from './dashboard.js?v=habit-goals-1';
 import { mountMobileNavigation } from './mobile-nav.js?v=growth-1';
@@ -36,8 +37,9 @@ mountMobileNavigation();
 let data;try{data=JSON.parse(appStorage.getItem('edi_focus_v1'))}catch{}
 data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...data};
 let storageFailed=false;
+let focusAudio=null;
 // Adopt focus state saved by another tab or device so the timer and Overview agree.
-addEventListener('app-storage-change',()=>{const raw=appStorage.getItem('edi_focus_v1');if(!raw||raw===JSON.stringify(data))return;let next;try{next=JSON.parse(raw)}catch{return}if(!next||typeof next!=='object')return;data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...next};for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];render()});
+addEventListener('app-storage-change',()=>{const raw=appStorage.getItem('edi_focus_v1');if(!raw||raw===JSON.stringify(data))return;let next;try{next=JSON.parse(raw)}catch{return}if(!next||typeof next!=='object')return;data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...next};for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];focusAudio?.sync(data.soundtrack);render()});
 function save(){try{appStorage.setItem('edi_focus_v1',JSON.stringify(data))}catch{if(!storageFailed){storageFailed=true;$('status').textContent='Unable to save focus data to the server.'}}}
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function applyTheme(theme){document.documentElement.dataset.theme=theme;try{for(const key of ['edi_os_theme','edifinance_theme','habittify_theme','edi_kanban_theme','edi_goals_theme','edi_notes_theme'])appStorage.setItem(key,theme)}catch{}for(const id of ['growth','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){const doc=$(id).contentDocument;if(doc)doc.documentElement.dataset.theme=theme}const sunIcon=document.querySelector('.sun-icon'),moonIcon=document.querySelector('.moon-icon');if(sunIcon&&moonIcon){sunIcon.style.display=theme==='dark'?'none':'block';moonIcon.style.display=theme==='dark'?'block':'none'}}
@@ -55,14 +57,7 @@ function tick(){if(data.deadline&&remainingSeconds(data,Date.now())===0){if(data
 setInterval(tick,500);document.addEventListener('visibilitychange',tick);tick();
 for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];
 $('saveSettings').onclick=()=>{const next={};for(const mode of ['focus','short','long']){const input=$(mode+'Length');if(!input.reportValidity())return;next[mode]=Number(input.value)}if((data.deadline||data.remaining!==data.lengths[data.mode]*60)&&!confirm('Save durations and reset this interval?'))return;data.lengths=next;setMode(data.mode);$('status').textContent='Timer settings saved.'};
-const TRACKS = { 'comfortable-mystery':{name:'Comfortable Mystery',src:'assets/music/comfortable-mystery.mp3'},inspired:{name:'Inspired',src:'assets/music/inspired.mp3'},'dreamy-flashback':{name:'Dreamy Flashback',src:'assets/music/dreamy-flashback.mp3'},'water-lily':{name:'Water Lily',src:'assets/music/water-lily.mp3'},'winter-reflections':{name:'Winter Reflections',src:'assets/music/winter-reflections.mp3'},carefree:{name:'Carefree',src:'assets/music/carefree.mp3'},'friendly-day':{name:'Friendly Day',src:'assets/music/friendly-day.mp3'},'thinking-music':{name:'Thinking Music',src:'assets/music/thinking-music.mp3'},'luminous-rain':{name:'Luminous Rain',src:'assets/music/luminous-rain.mp3'},'touching-story':{name:'Touching Story',src:'assets/music/touching-story.mp3'} };
-const VOLUME = 0.5;
-let currentAudio=null,playing=false,fileUrl=null,fileAudio=null;
-function stopSound(){try{if(currentAudio&&currentAudio!==fileAudio)currentAudio.pause();if(fileAudio)fileAudio.pause()}catch{}currentAudio=null;playing=false;$('play').textContent='▶ Play'}
-async function playSound(){stopSound();const key=$('sound').value;try{if(key==='file'){if(!fileAudio)throw Error('Choose an audio file first.');currentAudio=fileAudio}else{const track=TRACKS[key];if(!track)throw Error('Unknown track.');currentAudio=new Audio(track.src);currentAudio.loop=true;currentAudio.preload='auto'}currentAudio.volume=VOLUME;await currentAudio.play();playing=true;$('play').textContent='Ⅱ Pause'}catch(e){stopSound()}}
-$('play').onclick=()=>{if(playing)stopSound();else playSound()};
-$('sound').onchange=()=>{const key=$('sound').value;if(key!=='file'&&TRACKS[key]){const preloaded=new Audio(TRACKS[key].src);preloaded.load()}if(playing)playSound()};
-$('musicFile').onchange=()=>{const file=$('musicFile').files[0];if(!file)return;stopSound();if(fileUrl)URL.revokeObjectURL(fileUrl);fileUrl=URL.createObjectURL(file);fileAudio=new Audio(fileUrl);fileAudio.loop=true;let option=$('sound').querySelector('[value=file]');if(!option){option=new Option(file.name,'file');$('sound').add(option)}option.textContent=file.name;$('sound').value='file'};
+focusAudio=mountFocusAudio(data.soundtrack,settings=>{data.soundtrack=settings;save();});
 const sceneEl=document.querySelector('.focus-scene');
 function updateScene(){
   if(!sceneEl)return;
