@@ -2,7 +2,6 @@ import {KEY, dimensions, array, documentState, sources, habitData, summary, goal
 import {createReviewStepper} from './review-stepper.js?v=1';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const percent=value=>value===null?'Not measured':`${value}%`;
 const prettyDate=value=>value && !Number.isNaN(new Date(value+'T12:00:00Z').getTime())?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z')):'No target date';
 let selected=dimensions.some(d=>d.id===location.hash.slice(1))?location.hash.slice(1):'spirituality';
 let doc, source, habit=null, editing=null, baseline=null, refreshSequence=0, refreshing=false;
@@ -22,26 +21,53 @@ function navigate(page, item={}) {
     location.href=url.href;
   }
 }
-function metric(label,value) {return `<div class="metric"><span>${label}</span><strong>${percent(value)}</strong></div><div class="track"><span style="width:${value??0}%"></span></div>`;}
+const shortDate=value=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
+const capital=value=>String(value||'').replace(/^./,c=>c.toUpperCase());
+const pct=value=>value===null||value===undefined?'—':`${value}%`;
+function group(title,action,rows,empty) {
+  return `<section class="link-group"><header><h4>${title}</h4>${action}</header>${rows.length?`<ul>${rows.join('')}</ul>`:`<p class="link-empty">${empty}</p>`}</section>`;
+}
 function render() {
   try {doc=documentState();source=sources();} catch(error){$('status').textContent=error.message;$('addPlan').disabled=true;$('reviewBtn').disabled=true;return;}
   $('addPlan').disabled=false;$('reviewBtn').disabled=false;
-  $('cadences').innerHTML=['weekly','monthly','quarterly'].map(c=>{const next=nextReview(doc,c),due=next<=today();return `<button class="cadence" data-review="${c}"><span><strong>${c[0].toUpperCase()+c.slice(1)} review</strong><small>${due?'A moment to reconnect with your direction':`Next: ${prettyDate(next)}`}</small></span><span class="due">${due?'Due · Start →':'→'}</span></button>`;}).join('');
+  $('cadences').innerHTML=['weekly','monthly','quarterly'].map(c=>{const next=nextReview(doc,c),due=next<=today();return `<button class="cadence${due?' is-due':''}" data-review="${c}" title="${due?'Start your '+c+' review':'Next '+c+' review: '+prettyDate(next)}"><span class="cadence-name">${capital(c)}</span><span class="cadence-when">${due?'Due now':shortDate(next)}</span></button>`;}).join('');
   $('dimensions').innerHTML=dimensions.map(d=>{
     const plans=activePlans(d.id),s=summary(plans,source,habit);
-    return `<button class="dimension" data-dimension="${d.id}" style="--tone:${d.color}" aria-pressed="${d.id===selected}"><span class="dimension-top"><span class="dimension-icon" aria-hidden="true">${d.icon}</span><small>${plans.length} long-term · ${s.goals.length} SMART</small></span><h2>${d.name}</h2><p>${d.hint}</p>${metric('SMART progress',s.goalPct)}<div class="metric"><span>Habits · 7 days</span><strong>${habit?percent(s.habitPct):'Unavailable'}</strong></div><div class="metric"><span>Tasks completed</span><strong>${s.done} / ${s.tasks.length}</strong></div></button>`;
+    return `<button class="dimension" data-dimension="${d.id}" style="--tone:${d.color}" aria-pressed="${d.id===selected}">
+      <span class="dimension-head"><span class="dimension-icon" aria-hidden="true">${d.icon}</span><span class="dimension-name">${d.name}</span></span>
+      <span class="dimension-score${s.goalPct===null?' is-empty':''}"><strong>${s.goalPct??'—'}</strong>${s.goalPct===null?'':'<small>%</small>'}<span>SMART progress</span></span>
+      <span class="track" aria-hidden="true"><span style="width:${s.goalPct??0}%"></span></span>
+      <span class="dimension-foot"><span>Habits <b>${habit?pct(s.habitPct):'—'}</b></span><span>Tasks <b>${s.done}/${s.tasks.length}</b></span><span>Plans <b>${plans.length}</b></span></span>
+    </button>`;
   }).join('');
   const dimension=dimensions.find(d=>d.id===selected);
-  $('dimensionTitle').textContent=dimension.name;$('dimensionHint').textContent=dimension.hint;
+  $('detail').style.setProperty('--tone',dimension.color);
+  $('dimensionIcon').textContent=dimension.icon;$('dimensionTitle').textContent=dimension.name;$('dimensionHint').textContent=dimension.hint;
   const plans=doc.plans.filter(p=>p.dimensionId===selected);
   $('plans').innerHTML=plans.length?plans.map(p=>{
     const s=summary([p],source,habit);
-    const goalLinks=s.goals.map(g=>`<button data-goal="${esc(g.id)}" dir="auto">${esc(g.title)} · ${goalProgress(g,habit)===null?'No measures':goalProgress(g,habit)+'%'}${g.deadline&&g.deadline<today()&&array(g.tasks).some(t=>!t.done)?' · overdue':''}</button>`).join('');
-    const taskLinks=s.tasks.map(t=>`<button data-task="${esc(t.key)}" dir="auto">${t.done?'✓ ':''}${esc(t.title)}${t.dueDate?' · '+esc(prettyDate(t.dueDate)):''}</button>`).join('');
-    const habitLinks=s.habits.map(h=>`<button data-page="habittify" dir="auto">${esc(h.name)}</button>`).join('');
-    return `<article class="plan"><header class="section-head"><div><h3 dir="auto">${esc(p.title)}</h3><span class="meta">${esc(p.status||'active')} · ${esc(prettyDate(p.targetDate))} · SMART ${percent(s.goalPct)}</span></div><button data-edit="${esc(p.id)}">Edit connections</button></header>${p.why?`<p dir="auto">${esc(p.why)}</p>`:''}<div class="link-group"><h4>SMART goals</h4><div class="links">${goalLinks||'<span class="meta">No active goals linked.</span>'}<button data-page="goals">＋ Manage goals</button></div></div><div class="link-group"><h4>Supporting habits</h4><div class="links">${habitLinks||`<span class="meta">${habit?'No active habits linked.':'Habits unavailable; saved links are retained.'}</span>`}<button data-page="habittify">＋ Manage habits</button></div></div><div class="link-group"><h4>Related tasks · ${s.done} of ${s.tasks.length} done</h4><div class="links">${taskLinks||'<span class="meta">Link cards or a goal with checklist items.</span>'}<button data-page="kanban">＋ Open Kanban</button></div></div>${s.missing?`<p class="warning">${s.missing} saved connection(s) are missing or no longer active. Edit connections to review them.</p>`:''}</article>`;
-  }).join(''):'<div class="empty">Start with one meaningful long-term goal. Connect your current SMART goals, habits and tasks to give your daily effort a direction.</div>';
-  $('history').innerHTML=doc.reviews.length?[...doc.reviews].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).map(r=>`<details class="history-entry"><summary><strong>${esc(r.cadence)} review</strong><span class="meta">${esc(prettyDate(r.date))}</span></summary><div class="review-notes">${dimensions.map(d=>{const n=r.notes?.[d.id]||{},s=r.snapshot?.[d.id]||{};return `<article class="review-note"><h3>${d.name}</h3><small>SMART ${percent(s.goalPct??null)} · Habits ${percent(s.habitPct??null)} · Tasks ${s.done??0}/${s.tasks??0}</small><p dir="auto">${esc(n.reflection||'No reflection recorded.')}</p>${n.next?`<p dir="auto"><strong>Next step:</strong> ${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`).join(''):'<div class="empty">Your first review starts here. Capture wins, obstacles and a practical next step for each dimension.</div>';
+    const goalRows=s.goals.map(g=>{const value=goalProgress(g,habit),overdue=g.deadline&&g.deadline<today()&&array(g.tasks).some(t=>!t.done);return `<li><button class="link-row" data-goal="${esc(g.id)}"><span dir="auto">${esc(g.title)}</span><span class="link-value${overdue?' warning':''}">${overdue?'Overdue · ':''}${value===null?'No measures':value+'%'}</span></button></li>`;});
+    const habitRows=s.habits.map(h=>`<li><button class="link-row" data-page="habittify"><span dir="auto">${esc(h.name)}</span></button></li>`);
+    const taskRows=s.tasks.map(t=>`<li><button class="link-row${t.done?' is-done':''}" data-task="${esc(t.key)}"><span dir="auto">${esc(t.title)}</span><span class="link-value">${t.done?'Done':t.dueDate?esc(shortDate(t.dueDate)):''}</span></button></li>`);
+    const status=p.status||'active';
+    return `<article class="plan">
+      <header class="plan-head">
+        <div class="plan-title"><h3 dir="auto">${esc(p.title)}</h3><div class="plan-meta"><span class="pill pill-${esc(status)}">${esc(capital(status))}</span><span>${p.targetDate?'Target '+esc(prettyDate(p.targetDate)):'No target date'}</span></div></div>
+        <div class="plan-side"><div class="plan-progress"><strong>${pct(s.goalPct)}</strong><span>SMART</span></div><button class="ghost" data-edit="${esc(p.id)}">Edit</button></div>
+      </header>
+      ${p.why?`<p class="plan-why" dir="auto">${esc(p.why)}</p>`:''}
+      <div class="plan-links">
+        ${group('SMART goals','<button class="text-link" data-page="goals">Manage</button>',goalRows,'No active goals linked.')}
+        ${group('Habits','<button class="text-link" data-page="habittify">Manage</button>',habitRows,habit?'No active habits linked.':'Habits unavailable right now.')}
+        ${group(`Tasks <span class="count">${s.done}/${s.tasks.length}</span>`,'<button class="text-link" data-page="kanban">Kanban</button>',taskRows,'Link cards or a goal with checklist items.')}
+      </div>
+      ${s.missing?`<p class="plan-warning">${s.missing} saved connection${s.missing===1?' is':'s are'} missing or no longer active. Edit to review.</p>`:''}
+    </article>`;
+  }).join(''):'<div class="empty"><strong>No long-term goals here yet.</strong><span>Start with one meaningful direction, then connect the SMART goals, habits and tasks that move it forward.</span></div>';
+  $('history').innerHTML=doc.reviews.length?[...doc.reviews].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).map(r=>{
+    const noted=dimensions.filter(d=>r.notes?.[d.id]?.reflection||r.notes?.[d.id]?.next);
+    return `<details class="history-entry"><summary><span class="history-name">${esc(capital(r.cadence))} review</span><span class="history-meta">${noted.length} of ${dimensions.length} reflected</span><span class="history-date">${esc(prettyDate(r.date))}</span></summary><div class="review-notes">${noted.map(d=>{const n=r.notes[d.id],s=r.snapshot?.[d.id]||{};return `<article class="review-note" style="--tone:${d.color}"><header><h3>${d.name}</h3><small>SMART ${pct(s.goalPct??null)} · Habits ${pct(s.habitPct??null)} · Tasks ${s.done??0}/${s.tasks??0}</small></header>${n.reflection?`<p dir="auto">${esc(n.reflection)}</p>`:''}${n.next?`<p class="review-next" dir="auto"><span>Next</span>${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`;
+  }).join(''):'<div class="empty"><strong>No reviews yet.</strong><span>Your first review captures wins, obstacles and one practical next step for each dimension.</span></div>';
 }
 async function refresh() {
   const sequence=++refreshSequence;refreshing=true;$('refresh').disabled=true;
