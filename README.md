@@ -4,7 +4,7 @@
 
 **One self-hosted home for your focus, habits, goals, money and projects — with an MCP server so your AI assistant can work alongside you.**
 
-[![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4?logo=php&logoColor=white)](#requirements) [![MySQL 8](https://img.shields.io/badge/MySQL-8-4479a1?logo=mysql&logoColor=white)](#requirements) [![MCP server](https://img.shields.io/badge/MCP-26_tools-39e6ad)](#talk-to-your-life-os-with-ai) [![Docker](https://img.shields.io/badge/docker-compose_up-2496ed?logo=docker&logoColor=white)](#with-docker-recommended) [![Self-hosted](https://img.shields.io/badge/data-self--hosted-e9918c)](#your-data-stays-yours)
+[![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4?logo=php&logoColor=white)](#requirements) [![MySQL 8](https://img.shields.io/badge/MySQL-8-4479a1?logo=mysql&logoColor=white)](#requirements) [![MCP server](https://img.shields.io/badge/MCP-26_tools-39e6ad)](#talk-to-your-life-os-with-ai) [![Docker](https://img.shields.io/badge/docker-compose_up-2496ed?logo=docker&logoColor=white)](#with-docker-recommended) [![Self-hosted](https://img.shields.io/badge/data-self--hosted-e9918c)](#your-data-stays-yours) [![MIT license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 [Quick start](#quick-start) · [Tour](#a-quick-tour) · [AI / MCP](#talk-to-your-life-os-with-ai) · [Deploy](docs/deployment.md) · [API](docs/api.md)
 
@@ -202,6 +202,10 @@ Built with PHP, MySQL and vanilla JavaScript — no frontend build step, no fram
 - [Deployment guide](docs/deployment.md) — Apache, shared hosting, backups and migration
 - [Development guide](docs/development.md) — local checks and disposable integration fixtures
 - [Growth workspace](docs/growth.md) · [Debts and credits](docs/financial-commitments.md)
+
+## License
+
+[MIT](LICENSE) © 2026 Edris Ranjbar. Use it, fork it and build on it.
 
 ## Contributing
 
