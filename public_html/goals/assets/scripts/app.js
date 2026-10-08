@@ -5,7 +5,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 const KEY = "edi_goals_v1";
 const DRAFTS_KEY = "edi_goals_drafts_v1";
 const WIZARD_FIELDS = ["gTitle", "gSpecific", "gCategory",
-  "gRelevant", "gPriority", "gDeadline", "gStart"];
+  "gRelevant", "gPriority", "gDeadline", "gStart", "gProgressSource", "gHabit", "gHabitTarget"];
 const SMART_STEPS = ["specific", "measurable", "achievable", "relevant", "timebound"];
 const STEP_LABELS = {
   specific: "Specific",
@@ -28,6 +28,8 @@ let state = {
   detailId: null,
 };
 let wizardDraftSaveTimer = null;
+let habitContext = null;
+const progressResult = goal => LifeGoalProgress.result(goal, habitContext);
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 function load() {
@@ -52,7 +54,7 @@ function load() {
 
 function save() {
   try {
-    appStorage.setItem(KEY, JSON.stringify({ goals: state.goals }));
+    appStorage.setItem(KEY, JSON.stringify({...JSON.parse(appStorage.getItem(KEY) || "{}"), goals: state.goals }));
   } catch (e) {
     console.error("Failed to save goals:", e);
     showToast("Unable to save goals", "error");
@@ -101,7 +103,7 @@ function renderWizardMeasures() {
 function renderDetailMeasures(goal) {
   const container = $('detailMeasures');
   container.replaceChildren();
-  const measures = goalMeasures(goal);
+  const measures = goal.progressSource === "habit" ? [] : goalMeasures(goal);
   container.hidden = !measures.length;
   if (!measures.length) return;
   const heading = document.createElement('h4'); heading.textContent = 'Success measures'; container.append(heading);
@@ -155,17 +157,20 @@ function escapeHtml(s) {
   return div.innerHTML;
 }
 
-function calcProgress(goal) {
-  const total = goal.tasks.length;
-  if (!total) return 0;
-  const done = goal.tasks.filter((t) => t.done).length;
-  return Math.round((done / total) * 100);
+function calcProgress(goal) { return progressResult(goal).pct; }
+function isCompleted(goal) { return progressResult(goal).pct === 100; }
+function updateProgressFields() {
+  const linked=$('gProgressSource').value==='habit';
+  $('habitProgressFields').hidden=!linked;
+  $('wizardMeasures').hidden=linked; $('addMeasureBtn').hidden=linked;
+  $('habitPlanHelp').hidden=!linked;
+  document.querySelector('[data-panel="achievable"] .wizard-help').hidden=linked;
+  document.querySelector('.task-editor').hidden=linked; $('taskPreview').hidden=linked;
 }
-
-function isCompleted(goal) {
-  return goal.tasks.length > 0 && goal.tasks.every((t) => t.done);
+function progressCaption(g) {
+  const p=progressResult(g);
+  return p.pct===null ? 'Habit progress unavailable' : p.source==='measure' ? 'Success measures' : `${p.done} / ${p.total} ${p.unit} complete`;
 }
-
 function effectiveStatus(goal) {
   if (goal.status === "archived") return "archived";
   if (isCompleted(goal)) return "completed";
@@ -224,9 +229,9 @@ function renderStats() {
   const active = state.goals.filter((g) => effectiveStatus(g) === "active").length;
   const completed = state.goals.filter((g) => effectiveStatus(g) === "completed").length;
   const avgProgress = (() => {
-    const measurable = state.goals.filter((g) => g.tasks.length > 0);
+    const measurable = state.goals.filter((g) => (g.tasks.length > 0 || g.progressSource) && calcProgress(g)!==null);
     if (!measurable.length) return 0;
-    return Math.round(measurable.reduce((n, g) => n + calcProgress(g), 0) / measurable.length);
+    return Math.round(measurable.reduce((n, g) => n + (calcProgress(g) ?? 0), 0) / measurable.length);
   })();
 
   row.innerHTML = `
@@ -279,7 +284,7 @@ function goalCardHTML(g, index = 0) {
   const status = effectiveStatus(g);
   const progress = calcProgress(g);
   const completedCount = g.tasks.filter((t) => t.done).length;
-  const measures = goalMeasures(g);
+  const measures = g.progressSource === "habit" ? [] : goalMeasures(g);
   const nextTask = g.tasks.find(task => !task.done);
   const priority = ['low', 'medium', 'high'].includes(g.priority) ? g.priority : 'medium';
   const measureRows = measures.slice(0, 2).map(measure => {
@@ -296,12 +301,12 @@ function goalCardHTML(g, index = 0) {
       <div class="goal-card-heading"><span class="priority-dot ${priority}" title="${priority} priority" aria-label="${priority} priority"></span><h3 dir="auto">${escapeHtml(g.title || "Untitled goal")}</h3></div>
       ${g.specific ? `<p class="desc" dir="auto">${escapeHtml(g.specific)}</p>` : ''}
       <div class="goal-card-progress">
-        <div class="progress-row"><span>Task progress</span><strong>${progress}<small>%</small></strong></div>
-        <div class="progress-track" role="progressbar" aria-label="Tasks completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><div class="progress-fill" style="width:${progress}%"></div></div>
-        <div class="goal-progress-caption"><span>${completedCount} of ${g.tasks.length} tasks done</span><span>${g.tasks.length - completedCount} remaining</span></div>
+        <div class="progress-row"><span>${g.progressSource === "habit" ? "Habit progress" : "Progress"}</span><strong>${progress ?? "—"}<small>%</small></strong></div>
+        <div class="progress-track" role="progressbar" aria-label="Goal progress" aria-valuemin="0" aria-valuemax="100" ${progress===null ? 'aria-valuetext="Unavailable"' : `aria-valuenow="${progress}"`}><div class="progress-fill" style="width:${progress ?? 0}%"></div></div>
+        <div class="goal-progress-caption"><span>${escapeHtml(progressCaption(g))}</span><span>${g.progressSource === "habit" ? "Synced from Habittify" : g.progressSource === "measure" ? "" : g.tasks.length - completedCount + " remaining"}</span></div>
       </div>
       ${measures.length ? `<div class="goal-card-measures"><div class="goal-section-label">Success measures${measures.length > 2 ? `<span>+${measures.length - 2} more</span>` : ''}</div>${measureRows}</div>` : ''}
-      <div class="goal-next-task"><span class="goal-section-label">${status === 'archived' ? 'Archived goal' : nextTask ? 'Next task' : g.tasks.length ? 'Checklist complete' : 'Get started'}</span><p dir="auto">${escapeHtml(status === 'archived' ? 'Open to review your plan' : nextTask?.title || (g.tasks.length ? 'All planned tasks are done' : 'Add your first task'))}</p></div>
+      <div class="goal-next-task"><span class="goal-section-label">${g.progressSource === "habit" ? "Daily action" : status === 'archived' ? 'Archived goal' : nextTask ? 'Next task' : g.tasks.length ? 'Checklist complete' : 'Get started'}</span><p dir="auto">${escapeHtml(g.progressSource === 'habit' ? (g.habitProgress?.habitName || 'Record attendance in Habittify') : status === 'archived' ? 'Open to review your plan' : nextTask?.title || (g.tasks.length ? 'All planned tasks are done' : 'Add your first task'))}</p></div>
       <div class="footer-row">
         <span class="deadline ${deadlineClass(g)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${deadlineText(g)}</span>
         <span class="goal-open" aria-hidden="true">View goal <span>↗</span></span>
@@ -331,6 +336,11 @@ function openWizard(editGoalId = null) {
 
   const form = $("wizardForm");
   form.reset();
+  $('gHabit').replaceChildren();
+  const placeholder=new Option(habitContext ? 'Choose a habit' : 'Habits unavailable — refresh to retry', ''); $('gHabit').add(placeholder);
+  for(const h of habitContext?.habits || []) $('gHabit').add(new Option(h.name,String(h.id)));
+  const linked=state.goals.find(g=>g.id===editGoalId)?.habitProgress;
+  if(linked && ![...$('gHabit').options].some(o=>o.value===String(linked.habitId))) $('gHabit').add(new Option((linked.habitName||'Habit')+' (archived)',String(linked.habitId)));
   $("goalId").value = editGoalId || "";
   $("wizardEyebrow").textContent = editGoalId ? "Edit Goal" : "New Goal";
   $("wizardTitle").textContent = editGoalId ? "Refine this SMART goal" : "Define a SMART goal";
@@ -342,6 +352,9 @@ function openWizard(editGoalId = null) {
   } else if (editGoalId) {
     const g = state.goals.find((x) => x.id === editGoalId);
     if (g) {
+      $('gProgressSource').value=g.progressSource||'checklist';
+      $('gHabit').value=g.habitProgress?.habitId||'';
+      $('gHabitTarget').value=g.habitProgress?.targetDays||24;
       $("gTitle").value = g.title || "";
       $("gSpecific").value = g.specific || "";
       $("gCategory").value = g.category || "";
@@ -359,6 +372,7 @@ function openWizard(editGoalId = null) {
 
   if (!state.wizard.measures.length) state.wizard.measures.push({id: uid(), metric: '', target: null, unit: '', current: null});
   renderWizardMeasures();
+  updateProgressFields();
   renderCategoryDatalist();
   renderWizardTasks();
   clearWizardError();
@@ -445,7 +459,7 @@ function enableTaskDrag(list, tasks, onReorder) {
 
 function renderWizardTasks() {
   const ul = $("taskPreview");
-  if (!state.wizard.draftTasks.length) {
+  if ($('gProgressSource').value==='checklist' && !state.wizard.draftTasks.length) {
     ul.innerHTML = `<li style="color:var(--text-tertiary);font-size:13px;justify-content:center;">No tasks yet. Add at least one to make this goal actionable.</li>`;
     return;
   }
@@ -542,15 +556,17 @@ function clearWizardError() {
 
 function wizardStepValid(step) {
   if (step === 0) return $("gTitle").value.trim().length > 0;
+  if (step === 1 && $('gProgressSource').value==='habit') return !!$('gHabit').value && $('gHabitTarget').checkValidity() && Number($('gHabitTarget').value)>0;
+  if (step === 1 && $('gProgressSource').value==='measure' && !readWizardMeasures().some(m=>Number(m.target)>0)) return false;
   if (step === 1) return [...$('wizardMeasures').querySelectorAll('input')].every(input => input.checkValidity()) && readWizardMeasures().every(measure => measure.metric || (measure.target == null && measure.current == null && !measure.unit));
-  if (step === 2) return state.wizard.draftTasks.length > 0;
+  if (step === 2) return $('gProgressSource').value!=='checklist' || state.wizard.draftTasks.length > 0;
   return true;
 }
 
 function nextStep() {
   if (!wizardStepValid(state.wizard.step)) {
     if (state.wizard.step === 0) setWizardError("Give your goal a title before continuing.");
-    else if (state.wizard.step === 1) setWizardError("Name each measure and use valid, non-negative numbers.");
+    else if (state.wizard.step === 1) setWizardError("Choose a habit and whole-day target, or name each measure and use valid numbers.");
     else if (state.wizard.step === 2) setWizardError("Add at least one task before continuing.");
     return;
   }
@@ -570,22 +586,27 @@ function handleWizardSubmit(e) {
     $("gTitle").focus();
     return;
   }
-  if (!state.wizard.draftTasks.length) {
+  if ($('gProgressSource').value==='checklist' && !state.wizard.draftTasks.length) {
     showWizardStep(2);
     setWizardError("Add at least one task before saving.");
     return;
   }
 
+  if($('gProgressSource').value==='habit' && (!$('gStart').value || !$('gDeadline').value || $('gStart').value>$('gDeadline').value || Number($('gHabitTarget').value)>(new Date($('gDeadline').value)-new Date($('gStart').value))/86400000+1)) {
+    showWizardStep(4); setWizardError('Choose a valid date window with enough days for your target.'); return;
+  }
   const id = $("goalId").value || uid();
   if (!wizardStepValid(1)) {
     showWizardStep(1);
-    setWizardError('Name each measure and use valid, non-negative numbers.');
+    setWizardError('Choose a habit and whole-day target, or name each measure and use valid numbers.');
     return;
   }
   const measures = readWizardMeasures().filter(measure => measure.metric);
   const existing = state.goals.find((g) => g.id === id);
   const data = {
     id,
+    progressSource: $('gProgressSource').value,
+    habitProgress: $('gProgressSource').value==='habit' ? {habitId:$('gHabit').value,habitName:$('gHabit').selectedOptions[0].textContent,targetDays:Number($('gHabitTarget').value)} : null,
     title: $("gTitle").value.trim(),
     specific: $("gSpecific").value.trim(),
     category: $("gCategory").value.trim(),
@@ -612,6 +633,7 @@ function handleWizardSubmit(e) {
     showToast("Goal created", "success");
   }
   save();
+  LifeGoalProgress.load(state.goals,true).then(context=>{habitContext=context;render();}).catch(()=>{habitContext=null;render();});
   render();
   delete state.wizardDrafts[state.wizard.draftKey];
   clearTimeout(wizardDraftSaveTimer);
@@ -659,7 +681,7 @@ function renderSmartSummary(g) {
   const fields = [
     ["S · Specific", g.specific || g.title, true],
     ["M · Measurable", goalMeasures(g).map(measure => `${measure.metric}${measure.target != null ? ' (target ' + measure.target + (measure.unit ? ' ' + measure.unit : '') + ')' : ''}`).join(' · ') || null, true],
-    ["A · Achievable", `${g.tasks.length} task${g.tasks.length === 1 ? "" : "s"} planned`, true],
+    ["A · Achievable", g.progressSource === "habit" ? (g.habitProgress?.habitName || "Daily habit") : `${g.tasks.length} task${g.tasks.length === 1 ? "" : "s"} planned`, true],
     ["R · Relevant", g.relevant, true],
     ["T · Time-bound", g.deadline ? `Due ${formatDate(g.deadline)}` : "No deadline", true],
   ];
@@ -672,9 +694,13 @@ function renderSmartSummary(g) {
 function renderDetailProgress(g) {
   const pct = calcProgress(g);
   const done = g.tasks.filter((t) => t.done).length;
-  $("progressLabel").textContent = pct + "%";
-  $("progressCount").textContent = `${done} / ${g.tasks.length} task${g.tasks.length === 1 ? "" : "s"} complete`;
-  $("progressFill").style.width = pct + "%";
+  $("progressLabel").textContent = pct === null ? "—" : pct + "%";
+  $("progressCount").textContent = progressCaption(g);
+  $('bumpProgressBtn').hidden=!!g.progressSource && g.progressSource!=='checklist';
+  $('detailTaskSection').hidden=g.progressSource==='habit';
+  const p=progressResult(g); $('habitMilestones').hidden=p.source!=='habit';
+  $('habitMilestones').innerHTML=p.source==='habit' ? `<a href="/habittify/">Open Habittify ↗</a><div>${[...new Set([.25,.5,.75,1].map(n=>Math.ceil(p.total*n)))].map(n=>`<span class="${p.done!==null && p.done>=n?'reached':''}">${p.done!==null && p.done>=n?'✓ ':''}${n} days</span>`).join('')}</div>` : '';
+  $("progressFill").style.width = (pct ?? 0) + "%";
 }
 
 function renderDetailTasks(g) {
@@ -811,6 +837,7 @@ function showToast(message, type = "info") {
 // ── Event wiring ─────────────────────────────────────────────────────────────
 function setupEventListeners() {
   applyTheme();
+  $("gProgressSource").addEventListener("change", updateProgressFields);
 
   $("newGoalBtn").addEventListener("click", () => openWizard());
   $('addMeasureBtn').addEventListener('click', () => {
@@ -892,6 +919,19 @@ function setupEventListeners() {
 document.addEventListener("DOMContentLoaded", async () => {
   await window.appStorageReady;
   load();
+  try {habitContext=await LifeGoalProgress.load(state.goals,true);} catch(e) {showToast(e.message,'error');}
   setupEventListeners();
+  async function refreshHabitProgress() {
+    if($("wizardModal").open || document.activeElement === $("goalNotes")) return;
+    try {await appStorage.sync(); load(); habitContext=await LifeGoalProgress.load(state.goals,true);} catch(e) {habitContext=null; showToast(e.message,'error');}
+    render(); const g=state.goals.find(g=>g.id===state.detailId); if(g) {renderDetailProgress(g);renderDetailMeta(g);}
+  }
+  window.addEventListener('message',e=>{if(e.origin===location.origin && e.source===parent && e.data?.type==='goals-refresh')refreshHabitProgress();});
+  window.addEventListener('focus',refreshHabitProgress);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHabitProgress();});
+  setInterval(()=>{if(!document.hidden)refreshHabitProgress();},60000);
   render();
+  const requestedGoal = new URLSearchParams(location.search).get('goal');
+  const linkedGoal = state.goals.find(goal => String(goal.id) === requestedGoal);
+  if (linkedGoal) openDetail(linkedGoal.id);
 });

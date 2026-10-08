@@ -11,7 +11,7 @@ function api_dashboard(StateStore $store, PDO $db): array
     $goals = $store->get(GOALS_KEY, ['goals' => []])['goals'];
     $counts = ['active' => 0, 'completed' => 0, 'overdue' => 0];
     foreach ($goals as $goal) {
-        $status = goals_status($goal);
+        $status = goals_status($goal, $db);
         if (isset($counts[$status])) $counts[$status]++;
         if ($status === 'active' && !empty($goal['deadline']) && $goal['deadline'] < $today) $counts['overdue']++;
     }
@@ -43,7 +43,7 @@ function api_dispatch(PDO $db, string $method, string $path, array $body = [], a
     if ($resource === 'health' && $id === null) { api_method(['GET'], $method); return [['ok' => true, 'version' => 1], 200]; }
     if ($resource === 'dashboard' && $id === null) { api_method(['GET'], $method); return [api_dashboard($store, $db), 200]; }
     $status = $method === 'POST' && $action === '' && !in_array($resource, ['habits'], true) ? 201 : 200;
-    if ($resource === 'goals' && $action === '') return [goals_api($store, $method, $id, $body), $status];
+    if ($resource === 'goals' && $action === '') return [goals_api($store, $method, $id, $body, $db), $status];
     if ($resource === 'tasks' && ($action === '' || ($id !== null && $action === 'complete'))) {
         if ($action === 'complete') api_fields($body, []);
         return [tasks_api($store, $method, $id, $action === 'complete', $body, $query), $status];

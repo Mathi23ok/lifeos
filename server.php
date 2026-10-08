@@ -27,6 +27,16 @@ if ($relativePath === 'state.php') {
 
 life_os_require_auth();
 
+if ($relativePath === 'finance-obligations.php') {
+    require __DIR__ . '/finance-obligations.php';
+    return true;
+}
+
+if ($relativePath === 'kanban.php') {
+    require __DIR__ . '/kanban.php';
+    return true;
+}
+
 if ($relativePath === 'attachments.php') {
     require __DIR__ . '/attachments.php';
     return true;

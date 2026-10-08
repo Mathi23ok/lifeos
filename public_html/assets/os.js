@@ -1,10 +1,19 @@
+import { mountFocusAudio } from './focus-audio.js?v=playlist-1';
 import { remainingSeconds, nextMode } from './timer.mjs';
-import { mountDashboard, refreshDashboard } from './dashboard.js?v=habits-2';
+import { mountDashboard, refreshDashboard } from './dashboard.js?v=habit-goals-1';
+import { mountMobileNavigation } from './mobile-nav.js?v=growth-1';
 await window.appStorageReady;
 mountDashboard();
 const $=id=>document.getElementById(id);
 document.querySelector('nav a[href="#goals"]')?.insertAdjacentHTML('beforebegin','<a href="#calendar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18"/></svg> Calendar</a>');
 addEventListener('message',event=>{
+  if(event.origin===location.origin&&event.source===$('calendar').contentWindow&&event.data?.type==='calendar-open-payment'){
+    const {occurrenceId,dueDate}=event.data;
+    if(typeof occurrenceId!=='string'||typeof dueDate!=='string')return;
+    const frame=$('finance'),url=new URL(frame.dataset.src,location.href);
+    url.searchParams.set('payment',occurrenceId);url.searchParams.set('due',dueDate);
+    frame.src=url.href;location.hash='#finance';return;
+  }
   if(event.origin!==location.origin||event.source!==document.getElementById('calendar').contentWindow||event.data?.type!=='calendar-open-card')return;
   const {boardId,cardId}=event.data;
   if(typeof boardId!=='string'||typeof cardId!=='string')return;
@@ -14,16 +23,30 @@ addEventListener('message',event=>{
   frame.src=url.href;location.hash='#kanban';
 });
 document.querySelector('nav a[href="#notes"]')?.insertAdjacentHTML('beforebegin','<a href="#notepad"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 2v4m8-4v4M8 10h8m-8 4h8"/></svg> Notepad</a>');
+document.querySelector('nav a[href="#focus"]')?.insertAdjacentHTML('beforebegin','<a href="#growth"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21V11M12 16C3 16 3 6 3 6s9 0 9 10Zm0-5C12 3 21 3 21 3s0 8-9 8Z"/></svg> Growth</a>');
+addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.source!==$('growth').contentWindow||event.data?.type!=='growth-open')return;
+  const {page,goalId,boardId,cardId}=event.data;
+  if(!['goals','kanban','habittify','finance'].includes(page))return;
+  const frame=$(page),url=new URL(frame.dataset.src,location.href);
+  if(page==='goals'&&typeof goalId==='string')url.searchParams.set('goal',goalId);
+  if(page==='kanban'){if(typeof boardId==='string')url.searchParams.set('board',boardId);if(typeof cardId==='string')url.searchParams.set('card',cardId);}
+  frame.src=url.href;location.hash='#'+page;
+});
+mountMobileNavigation();
 let data;try{data=JSON.parse(appStorage.getItem('edi_focus_v1'))}catch{}
 data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...data};
 let storageFailed=false;
+let focusAudio=null;
+// Adopt focus state saved by another tab or device so the timer and Overview agree.
+addEventListener('app-storage-change',()=>{const raw=appStorage.getItem('edi_focus_v1');if(!raw||raw===JSON.stringify(data))return;let next;try{next=JSON.parse(raw)}catch{return}if(!next||typeof next!=='object')return;data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...next};for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];focusAudio?.sync(data.soundtrack);render()});
 function save(){try{appStorage.setItem('edi_focus_v1',JSON.stringify(data))}catch{if(!storageFailed){storageFailed=true;$('status').textContent='Unable to save focus data to the server.'}}}
 const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-function applyTheme(theme){document.documentElement.dataset.theme=theme;try{for(const key of ['edi_os_theme','edifinance_theme','habittify_theme','edi_kanban_theme','edi_goals_theme','edi_notes_theme'])appStorage.setItem(key,theme)}catch{}for(const id of ['finance','habittify','kanban','calendar','goals','notes','notepad','settings']){const doc=$(id).contentDocument;if(doc)doc.documentElement.dataset.theme=theme}const sunIcon=document.querySelector('.sun-icon'),moonIcon=document.querySelector('.moon-icon');if(sunIcon&&moonIcon){sunIcon.style.display=theme==='dark'?'none':'block';moonIcon.style.display=theme==='dark'?'block':'none'}}
+function applyTheme(theme){document.documentElement.dataset.theme=theme;try{for(const key of ['edi_os_theme','edifinance_theme','habittify_theme','edi_kanban_theme','edi_goals_theme','edi_notes_theme'])appStorage.setItem(key,theme)}catch{}for(const id of ['growth','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){const doc=$(id).contentDocument;if(doc)doc.documentElement.dataset.theme=theme}const sunIcon=document.querySelector('.sun-icon'),moonIcon=document.querySelector('.moon-icon');if(sunIcon&&moonIcon){sunIcon.style.display=theme==='dark'?'none':'block';moonIcon.style.display=theme==='dark'?'block':'none'}}
 let theme='dark';try{theme=appStorage.getItem('edi_os_theme')||appStorage.getItem('edifinance_theme')||theme}catch{}applyTheme(theme);
 $('theme').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-for(const id of ['finance','habittify','kanban','calendar','goals','notes','notepad','settings'])$(id).addEventListener('load',()=>{const root=$(id).contentDocument.documentElement;root.dataset.theme=document.documentElement.dataset.theme;new MutationObserver(()=>{if(root.dataset.theme!==document.documentElement.dataset.theme)applyTheme(root.dataset.theme)}).observe(root,{attributes:true,attributeFilter:['data-theme']})});
-function route(){const id=['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'dashboard';for(const key of ['dashboard','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){$(key).hidden=key!==id;if(key===id&&$(key).dataset.src&&!$(key).getAttribute('src'))$(key).src=$(key).dataset.src}document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.hash==='#'+id?'page':'false'));document.title='Edi Life OS · '+(id==='dashboard'?'Overview':id[0].toUpperCase()+id.slice(1));if(id==='dashboard')refreshDashboard();if(id==='calendar')$('calendar').contentWindow?.postMessage({type:'calendar-refresh'},location.origin)}
+for(const id of ['growth','finance','habittify','kanban','calendar','goals','notes','notepad','settings'])$(id).addEventListener('load',()=>{const root=$(id).contentDocument.documentElement;root.dataset.theme=document.documentElement.dataset.theme;new MutationObserver(()=>{if(root.dataset.theme!==document.documentElement.dataset.theme)applyTheme(root.dataset.theme)}).observe(root,{attributes:true,attributeFilter:['data-theme']})});
+function route(){const id=['dashboard','growth','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'dashboard';for(const key of ['dashboard','growth','focus','finance','habittify','kanban','calendar','goals','notes','notepad','settings']){$(key).hidden=key!==id;if(key===id&&$(key).dataset.src&&!$(key).getAttribute('src'))$(key).src=$(key).dataset.src}document.querySelectorAll('nav a').forEach(a=>a.setAttribute('aria-current',a.hash==='#'+id?'page':'false'));document.title='Edi Life OS · '+(id==='dashboard'?'Overview':id[0].toUpperCase()+id.slice(1));if(id==='dashboard'){appStorage.sync();refreshDashboard()}if(id==='goals')$('goals').contentWindow?.postMessage({type:'goals-refresh'},location.origin);if(id==='finance')$('finance').contentWindow?.postMessage({type:'finance-refresh'},location.origin);if(id==='growth')$('growth').contentWindow?.postMessage({type:'growth-refresh'},location.origin);if(id==='calendar')$('calendar').contentWindow?.postMessage({type:'calendar-refresh'},location.origin)}
 addEventListener('hashchange',route);route();
 function render(){const seconds=remainingSeconds(data,Date.now());const label=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');$('clock').textContent=label;$('navTimer').textContent=data.deadline?label:'';$('start').textContent=data.deadline?'Pause':data.mode==='focus'?'Start focus':'Start break';$('cycle').textContent=`Session ${data.round%4+1} of 4`;document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===data.mode)));const today=data.history.filter(h=>h.day===day());$('completed').textContent=today.length;$('minutes').textContent=today.reduce((n,h)=>n+h.minutes,0);}
 function setMode(mode){data.mode=mode;data.deadline=null;data.remaining=data.lengths[mode]*60;save();render()}
@@ -34,14 +57,7 @@ function tick(){if(data.deadline&&remainingSeconds(data,Date.now())===0){if(data
 setInterval(tick,500);document.addEventListener('visibilitychange',tick);tick();
 for(const mode of ['focus','short','long'])$(mode+'Length').value=data.lengths[mode];
 $('saveSettings').onclick=()=>{const next={};for(const mode of ['focus','short','long']){const input=$(mode+'Length');if(!input.reportValidity())return;next[mode]=Number(input.value)}if((data.deadline||data.remaining!==data.lengths[data.mode]*60)&&!confirm('Save durations and reset this interval?'))return;data.lengths=next;setMode(data.mode);$('status').textContent='Timer settings saved.'};
-const TRACKS = { 'comfortable-mystery':{name:'Comfortable Mystery',src:'assets/music/comfortable-mystery.mp3'},inspired:{name:'Inspired',src:'assets/music/inspired.mp3'},'dreamy-flashback':{name:'Dreamy Flashback',src:'assets/music/dreamy-flashback.mp3'},'water-lily':{name:'Water Lily',src:'assets/music/water-lily.mp3'},'winter-reflections':{name:'Winter Reflections',src:'assets/music/winter-reflections.mp3'},carefree:{name:'Carefree',src:'assets/music/carefree.mp3'},'friendly-day':{name:'Friendly Day',src:'assets/music/friendly-day.mp3'},'thinking-music':{name:'Thinking Music',src:'assets/music/thinking-music.mp3'},'luminous-rain':{name:'Luminous Rain',src:'assets/music/luminous-rain.mp3'},'touching-story':{name:'Touching Story',src:'assets/music/touching-story.mp3'} };
-const VOLUME = 0.5;
-let currentAudio=null,playing=false,fileUrl=null,fileAudio=null;
-function stopSound(){try{if(currentAudio&&currentAudio!==fileAudio)currentAudio.pause();if(fileAudio)fileAudio.pause()}catch{}currentAudio=null;playing=false;$('play').textContent='▶ Play'}
-async function playSound(){stopSound();const key=$('sound').value;try{if(key==='file'){if(!fileAudio)throw Error('Choose an audio file first.');currentAudio=fileAudio}else{const track=TRACKS[key];if(!track)throw Error('Unknown track.');currentAudio=new Audio(track.src);currentAudio.loop=true;currentAudio.preload='auto'}currentAudio.volume=VOLUME;await currentAudio.play();playing=true;$('play').textContent='Ⅱ Pause'}catch(e){stopSound()}}
-$('play').onclick=()=>{if(playing)stopSound();else playSound()};
-$('sound').onchange=()=>{const key=$('sound').value;if(key!=='file'&&TRACKS[key]){const preloaded=new Audio(TRACKS[key].src);preloaded.load()}if(playing)playSound()};
-$('musicFile').onchange=()=>{const file=$('musicFile').files[0];if(!file)return;stopSound();if(fileUrl)URL.revokeObjectURL(fileUrl);fileUrl=URL.createObjectURL(file);fileAudio=new Audio(fileUrl);fileAudio.loop=true;let option=$('sound').querySelector('[value=file]');if(!option){option=new Option(file.name,'file');$('sound').add(option)}option.textContent=file.name;$('sound').value='file'};
+focusAudio=mountFocusAudio(data.soundtrack,settings=>{data.soundtrack=settings;save();});
 const sceneEl=document.querySelector('.focus-scene');
 function updateScene(){
   if(!sceneEl)return;

@@ -1,4 +1,7 @@
+import './goal-progress.js';
 import { refreshWeatherCard } from './weather.js?v=weather-7d-1';
+import { remainingSeconds } from './timer.mjs';
+import { mountGrowthOverview, refreshGrowthOverview } from './growth-overview.js';
 
 const readJson = (key) => {
   try { return JSON.parse(appStorage.getItem(key) || 'null'); } catch { return null; }
@@ -55,7 +58,7 @@ function smoothPath(points) {
 export function mountDashboard() {
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
-  stylesheet.href = 'assets/dashboard.css?v=weather-7d-1';
+  stylesheet.href = 'assets/dashboard.css?v=growth-1';
   document.head.append(stylesheet);
   const nav = document.querySelector('.os-nav nav');
   const overview = document.createElement('a');
@@ -90,7 +93,7 @@ export function mountDashboard() {
         <p id="score-copy">A live composite of how your day is shaping up across focus, habits, goals and work.</p>
         <span class="score-grade">Grade: <em id="score-grade">—</em></span><span class="score-delta" id="score-delta"></span>
         <div class="score-parts" aria-label="Score breakdown">
-          <div class="score-part"><small>Focus</small><strong id="part-focus">0</strong><span class="part-track"><span class="part-fill" id="fill-focus"></span></span></div>
+          <div class="score-part" title="Today's focus time toward a 90-minute daily target"><small>Focus today</small><strong id="part-focus">0</strong><span class="part-track"><span class="part-fill" id="fill-focus"></span></span></div>
           <div class="score-part"><small>Habits</small><strong id="part-habits">0</strong><span class="part-track"><span class="part-fill" id="fill-habits"></span></span></div>
           <div class="score-part"><small>Goals</small><strong id="part-goals">0</strong><span class="part-track"><span class="part-fill" id="fill-goals"></span></span></div>
           <div class="score-part"><small>Work</small><strong id="part-work">0</strong><span class="part-track"><span class="part-fill" id="fill-work"></span></span></div>
@@ -144,9 +147,13 @@ export function mountDashboard() {
     <p class="dash-privacy">Your data is saved in MySQL on this server.</p>`;
 
   document.getElementById('focus').before(main);
+  mountGrowthOverview(main);
   addEventListener('storage', () => { if (!main.hidden) refreshDashboard(); });
   addEventListener('app-storage-change', () => { if (!main.hidden) refreshDashboard(); });
-  addEventListener('focus', () => { if (!main.hidden) refreshDashboard(); });
+  addEventListener('focus', () => { if (!main.hidden) { appStorage.sync(); refreshDashboard(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !main.hidden) { appStorage.sync(); refreshDashboard(); } });
+  // Keep in-progress focus time and other devices' changes current while open.
+  setInterval(() => { if (!document.hidden && !main.hidden) { appStorage.sync(); refreshDashboard(); } }, 60000);
 }
 
 let refreshSequence = 0;
@@ -171,6 +178,14 @@ export async function refreshDashboard() {
     const minutes = Number(item?.minutes) || 0;
     focusByDay[item.day] = (focusByDay[item.day] || 0) + minutes;
   }
+  // Count the running or paused focus interval so today's total moves before it completes.
+  let liveMin = 0;
+  const focusLength = Number(focus?.lengths?.focus) || 0;
+  if (focus?.mode === 'focus' && focusLength > 0) {
+    const timer = { deadline: null, remaining: focusLength * 60, ...focus };
+    liveMin = Math.max(0, Math.floor((focusLength * 60 - remainingSeconds(timer, Date.now())) / 60));
+    if (liveMin > 0) focusByDay[today] = (focusByDay[today] || 0) + liveMin;
+  }
 
   // ── focus: today, 7-day window, deltas ─────────────────────────────
   const todayMin = focusByDay[today] || 0;
@@ -186,21 +201,23 @@ export async function refreshDashboard() {
   const avgPrev = prevMin / 7;
   const todaySessions = history.filter(item => item?.day === today).length;
   const weekSessions = history.filter(item => { const k = item?.day; return k >= addDaysISO(today, -7) && k <= today; }).length;
-  const focusPct = clamp(avg7 / 90 * 100); // 90 focused minutes/day = full score
+  const focusPct = clamp(todayMin / 90 * 100); // Today's progress toward 90 focused minutes, including the current interval.
   renderMetricDelta('focus-delta', todayMin, avg7, 'min');
   set('m-focus', number(todayMin));
-  set('m-focus-foot', `${number(todaySessions)} session${todaySessions === 1 ? '' : 's'} today · week avg ${number(Math.round(avg7))} min`);
+  set('m-focus-foot', `${number(todaySessions)} session${todaySessions === 1 ? '' : 's'} today${liveMin ? ` (+${number(liveMin)} min in progress)` : ''} · week avg ${number(Math.round(avg7))} min`);
 
   // ── goals ──────────────────────────────────────────────────────────
   const goalsData = readJson('edi_goals_v1');
   const goals = safeArray(goalsData?.goals).filter(g => g && g.status !== 'archived');
-  const activeGoals = goals.filter(g => !(isArray(g.tasks) && g.tasks.length && g.tasks.every(t => t.done)));
+  let goalHabitContext=null;
+  if(goals.some(g=>g.progressSource==='habit')) {try {goalHabitContext=await LifeGoalProgress.load(goals);} catch { /* Show unavailable instead of invented attendance. */ }}
+  const activeGoals = goals.filter(g => LifeGoalProgress.result(g,goalHabitContext).pct!==100);
   const goalProgress = activeGoals.map(g => {
-    const tasks = safeArray(g.tasks);
-    const done = tasks.filter(t => t.done).length;
-    return { goal: g, total: tasks.length, done, pct: tasks.length ? done / tasks.length * 100 : 0 };
+    const p=LifeGoalProgress.result(g,goalHabitContext);
+    return {goal:g,total:p.total,done:p.done,pct:p.pct,unit:p.unit};
   });
-  const goalAvg = goalProgress.length ? goalProgress.reduce((sum, g) => sum + g.pct, 0) / goalProgress.length : 0;
+  const knownGoalProgress=goalProgress.filter(g=>g.pct!==null);
+  const goalAvg = knownGoalProgress.length ? knownGoalProgress.reduce((sum, g) => sum + g.pct, 0) / knownGoalProgress.length : 0;
   const dueSoon = activeGoals.filter(g => {
     if (!g.deadline) return false;
     return (new Date(g.deadline + 'T00:00:00') - new Date(today + 'T00:00:00')) <= 7 * 86400000;
@@ -248,6 +265,7 @@ export async function refreshDashboard() {
     if (sequence !== refreshSequence) return;
   }
   // MySQL returns habit IDs as strings while the logs API emits integers.
+  refreshGrowthOverview(habitsOk ? {habits, logs: {...logs,...(goalHabitContext?.logs || {})}} : null);
   const habitIds = new Set(habits.map(h => String(h.id)));
   const totalHabits = habits.length;
   const completedCount = key => new Set(safeArray(logs[key]).map(String).filter(id => habitIds.has(id))).size;
@@ -531,7 +549,7 @@ function renderGoalList(goalProgress, today) {
       else chip = `<span class="chip ok">${days}d left</span>`;
     }
     return `<div class="goal-row">
-      <div class="goal-head"><span class="goal-name">${goal.title}<span class="goal-cat">${goal.category || 'General'}${total ? ` · ${done}/${total} tasks` : ''}</span></span><span class="goal-pct">${number(Math.round(pct))}%</span></div>
+      <div class="goal-head"><span class="goal-name">${goal.title}<span class="goal-cat">${goal.category || 'General'}${total ? ` · ${done ?? "—"}/${total} ${goal.progressSource === "habit" ? "days" : "tasks"}` : ''}</span></span><span class="goal-pct">${pct===null?"—":number(Math.round(pct))+"%"}</span></div>
       <span class="goal-track"><span class="goal-fill" data-w="${clamp(pct)}"></span></span>
       <span class="goal-meta"><span>${goal.metric || ''}</span>${chip}</span>
     </div>`;
@@ -598,7 +616,7 @@ function renderFinance() {
       const pct = category.target > 0 ? clamp(amount / category.target * 100) : 100;
       const over = category.target > 0 && amount > category.target;
       return `<div class="fin-cat">
-        <div class="fin-cat-head"><span>${category.label}${over ? ' · over' : ''}</span><b>${number(Math.round(pct))}% of budget</b></div>
+        <div class="fin-cat-head"><span>${category.label}${over ? ' · over' : ''}</span><b>${pct===null?"—":number(Math.round(pct))+"%"} of budget</b></div>
         <span class="fin-cat-track"><span class="fin-cat-fill" data-w="${pct}" style="${over ? 'background:var(--danger)' : ''}"></span></span>
       </div>`;
     }).join('')}</div>`;

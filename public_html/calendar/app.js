@@ -25,6 +25,11 @@ let dayOnly = false;
 let query = '';
 let refreshing = false;
 let lastStorageRaw = null;
+let financialEvents = [];
+let financialPlans = false;
+let financialError = '';
+let refreshToken = 0;
+const financeBoardId = '__financial_commitments__';
 const enabledBoards = new Map();
 
 function boardColor(id) {
@@ -46,6 +51,11 @@ function readBoards(raw) {
       }
     }
   }
+  if (financialPlans) {
+    boards.push({id:financeBoardId,name:'Financial commitments'});
+    if(!enabledBoards.has(financeBoardId))enabledBoards.set(financeBoardId,true);
+  }
+  events.push(...financialEvents);
   events.sort((a, b) => (a.date + (a.time || '00:00')).localeCompare(b.date + (b.time || '00:00')) || a.title.localeCompare(b.title));
 }
 function isOverdue(event) {
@@ -56,6 +66,11 @@ function visibleEvents() {
   return events.filter(event => enabledBoards.get(event.boardId) && ($('includeCompleted').checked || !event.completed) && (!query || `${event.title} ${event.boardName} ${event.columnName}`.toLocaleLowerCase().includes(query)));
 }
 function openCard(event) {
+  if(event.source==='finance'){
+    if(window.parent!==window)window.parent.postMessage({type:'calendar-open-payment',occurrenceId:event.id,dueDate:event.date},location.origin);
+    else location.href=`../finance/index.html?payment=${encodeURIComponent(event.id)}&due=${encodeURIComponent(event.date)}`;
+    return;
+  }
   if (window.parent !== window) window.parent.postMessage({type: 'calendar-open-card', boardId: event.boardId, cardId: event.id}, location.origin);
   else location.href = `../kanban/index.html?board=${encodeURIComponent(event.boardId)}&card=${encodeURIComponent(event.id)}`;
 }
@@ -83,10 +98,12 @@ function taskButton(event, kind) {
   return button;
 }
 function selectDay(date, showSchedule = false) {
+  const previousMonth=month.getFullYear()+'-'+month.getMonth();
   selectedDay = dateKey(date);
   month = new Date(date.getFullYear(), date.getMonth(), 1);
   if (showSchedule) { view = 'schedule'; dayOnly = true; overdueOnly = false; }
   render();
+  if(previousMonth!==month.getFullYear()+'-'+month.getMonth())refresh();
 }
 function renderBoardFilters() {
   const focusedBoard = document.activeElement?.dataset.boardId;
@@ -137,13 +154,13 @@ function renderSchedule(filtered) {
     const labels = document.createElement('div'); const weekday = document.createElement('span'); weekday.textContent = date.toLocaleDateString('en-US', {weekday: 'short'}).toUpperCase(); const monthLabel = document.createElement('span'); monthLabel.textContent = date.toLocaleDateString('en-US', {month: 'short', year: 'numeric'}); labels.append(weekday, monthLabel); heading.append(number, labels);
     const cards = document.createElement('div'); tasks.forEach(event => cards.append(taskButton(event, 'schedule-task'))); group.append(heading, cards); container.append(group);
   });
-  if (!list.length) container.append(emptyState(overdueOnly ? 'All caught up' : query ? 'No matching cards' : 'A little room to breathe', overdueOnly ? 'No overdue cards in the selected boards.' : query ? 'Try another title, board name, or list name.' : 'No cards are due here. Give a Kanban card a due date and it will appear on your calendar.'));
+  if (!list.length) container.append(emptyState(overdueOnly ? 'All caught up' : query ? 'No matching items' : 'A little room to breathe', overdueOnly ? 'No overdue items in the selected calendars.' : query ? 'Try another title, board name, or list name.' : 'No items are due here. Add a Kanban due date or a Finance payment plan.'));
 }
 function render() {
   currentTime = tehran(); today = currentTime.date;
   const filtered = visibleEvents();
   const monthName = month.toLocaleDateString('en-US', {month: 'long', year: 'numeric'});
-  $('monthTitle').textContent = overdueOnly ? 'Overdue cards' : query ? 'Search results' : dayOnly ? parseDate(selectedDay).toLocaleDateString('en-US', {month: 'long', day: 'numeric'}) : view === 'schedule' ? 'Schedule' : monthName;
+  $('monthTitle').textContent = overdueOnly ? 'Overdue items' : query ? 'Search results' : dayOnly ? parseDate(selectedDay).toLocaleDateString('en-US', {month: 'long', day: 'numeric'}) : view === 'schedule' ? 'Schedule' : monthName;
   $('miniMonthTitle').textContent = monthName;
   $('viewSelect').value = view;
   const schedule = view === 'schedule' || !!query || overdueOnly || dayOnly;
@@ -155,35 +172,52 @@ function render() {
   const dayTasks = filtered.filter(event => event.date === selectedDay);
   $('selectedDayCount').textContent = dayTasks.length;
   $('dayTasks').replaceChildren(...dayTasks.map(event => taskButton(event, 'day-task')));
-  if (!dayTasks.length) { const empty = document.createElement('p'); empty.className = 'day-empty'; empty.textContent = 'No cards due on this day.'; $('dayTasks').append(empty); }
-  $('calendarNote').textContent = `${events.length} dated card${events.length === 1 ? '' : 's'} across ${boards.length} board${boards.length === 1 ? '' : 's'}.${undated ? ` ${undated} cards have no due date.` : ''}`;
+  if (!dayTasks.length) { const empty = document.createElement('p'); empty.className = 'day-empty'; empty.textContent = 'No tasks or financial dues on this day.'; $('dayTasks').append(empty); }
+  $('calendarNote').textContent = `${events.length} dated items, including ${financialEvents.length} financial dues in the loaded range and earlier unpaid dues.${undated ? ` ${undated} cards have no due date.` : ''} ${financialError}`;
   const inMonth = filtered.filter(event => event.date.startsWith(dateKey(month).slice(0, 7))).length;
-  $('calendarStatus').textContent = !schedule && !inMonth ? 'No cards due this month. Choose another month or add a due date in Kanban.' : '';
+  $('calendarStatus').textContent = financialError || (!schedule && !inMonth ? 'No items due this month. Choose another month or add a Kanban date or Finance payment plan.' : '');
 }
 async function refresh() {
-  if (refreshing) return;
+  const token=++refreshToken;
   refreshing = true; $('refreshBtn').disabled = true;
   try {
-    const response = await fetch('/state.php', {headers: {Accept: 'application/json'}, cache: 'no-store', redirect: 'error'});
+    const first=new Date(month.getFullYear(),month.getMonth(),1-month.getDay());
+    const last=new Date(first.getFullYear(),first.getMonth(),first.getDate()+41);
+    const [boardResult,financeResult]=await Promise.allSettled([
+      fetch('/state.php', {headers: {Accept: 'application/json'}, cache: 'no-store', redirect: 'error'}),
+      fetch(`/finance-obligations.php?start=${dateKey(first)}&end=${dateKey(last)}`,{cache:'no-store',redirect:'error'})
+    ]);
+    if(token!==refreshToken)return;
+    if(boardResult.status==='rejected')throw Error('Unable to load board tasks.');
+    const response=boardResult.value;
     if (!response.ok) throw new Error('Unable to load board tasks. Refresh or sign in again.');
-    const payload = await response.json(); lastStorageRaw = appStorage.getItem(KEY); readBoards(payload.data[KEY]); render();
+    try{
+      if(financeResult.status==='rejected'||!financeResult.value.ok)throw Error('Financial dues unavailable. Refresh to retry.');
+      const finance=(await financeResult.value.json()).data;
+      if(token!==refreshToken)return;
+      financialPlans=finance.plans.length>0;
+      financialEvents=finance.occurrences.filter(o=>!o.skipped).map(o=>({id:o.id,source:'finance',boardId:financeBoardId,boardName:'Finance',columnName:o.paymentIssue?'Needs reconciliation':o.status==='rejected'?'Deferred':o.status,title:`${o.title}${o.type!=='recurring'?' · '+(o.index+1)+'/'+o.count:''} · ${new Intl.NumberFormat('en-US').format(o.amount)} Toman`,date:o.date,time:'',completed:o.status==='paid',color:'#f3c969'}));
+      financialError='';
+    }catch(error){if(token!==refreshToken)return;financialEvents=[];financialPlans=false;financialError=error.message;}
+    const payload = await response.json();if(token!==refreshToken)return;lastStorageRaw = appStorage.getItem(KEY); readBoards(payload.data[KEY]); render();
   } catch (error) { $('calendarStatus').textContent = error.message; }
-  finally { refreshing = false; $('refreshBtn').disabled = false; }
+  finally {if(token===refreshToken){refreshing = false; $('refreshBtn').disabled = false;}}
 }
 $('todayBtn').addEventListener('click', () => { overdueOnly = false; dayOnly = false; query = ''; $('searchInput').value = ''; selectDay(parseDate(tehran().date)); });
-for (const [id, offset] of [['prevBtn', -1], ['nextBtn', 1]]) $(id).addEventListener('click', () => { month = new Date(month.getFullYear(), month.getMonth() + offset, 1); selectedDay = dateKey(month); overdueOnly = false; dayOnly = false; view = 'month'; render(); });
+for (const [id, offset] of [['prevBtn', -1], ['nextBtn', 1]]) $(id).addEventListener('click', () => { month = new Date(month.getFullYear(), month.getMonth() + offset, 1); selectedDay = dateKey(month); overdueOnly = false; dayOnly = false; view = 'month'; render(); refresh(); });
 $('viewSelect').addEventListener('change', () => { view = $('viewSelect').value; overdueOnly = false; dayOnly = false; render(); });
 $('includeCompleted').addEventListener('change', render);
 $('allBoardsBtn').addEventListener('click', () => { boards.forEach(board => enabledBoards.set(board.id, true)); render(); });
 $('overdueBtn').addEventListener('click', () => { overdueOnly = !overdueOnly; dayOnly = false; query = ''; $('searchInput').value = ''; view = overdueOnly ? 'schedule' : 'month'; render(); });
 $('searchInput').addEventListener('input', () => { query = $('searchInput').value.trim().toLocaleLowerCase(); overdueOnly = false; dayOnly = false; if (query) view = 'schedule'; render(); });
 $('refreshBtn').addEventListener('click', refresh);
-addEventListener('app-storage-change', () => { try { const raw = appStorage.getItem(KEY); if (raw !== lastStorageRaw) { lastStorageRaw = raw; readBoards(raw); render(); } } catch { $('calendarStatus').textContent = 'Unable to read board tasks. Try refreshing.'; } });
+let financialRefreshTimer;
+addEventListener('app-storage-change', () => { try { const raw = appStorage.getItem(KEY); if (raw !== lastStorageRaw) { lastStorageRaw = raw; readBoards(raw); render(); } clearTimeout(financialRefreshTimer);financialRefreshTimer=setTimeout(refresh,250); } catch { $('calendarStatus').textContent = 'Unable to read board tasks. Try refreshing.'; } });
 addEventListener('message', e => { if (e.origin === location.origin && e.source === window.parent && e.data?.type === 'calendar-refresh') refresh(); });
 addEventListener('focus', refresh);
 setInterval(() => { if (document.visibilityState === 'visible') render(); }, 60000);
 try {
   await window.appStorageReady;
   document.documentElement.dataset.theme = appStorage.getItem('edi_os_theme') || 'dark';
-  lastStorageRaw = appStorage.getItem(KEY); readBoards(lastStorageRaw); render();
+  lastStorageRaw = appStorage.getItem(KEY); readBoards(lastStorageRaw); render(); await refresh();
 } catch { $('calendarStatus').textContent = 'Unable to load board tasks. Check your connection and refresh.'; }

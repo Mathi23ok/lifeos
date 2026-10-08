@@ -17,7 +17,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="assets/styles/style.css?v=cards-2">
+  <link rel="stylesheet" href="assets/styles/style.css?v=habit-progress-1">
 </head>
 <body>
   <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -93,12 +93,15 @@
 
       <div class="wizard-panel" data-panel="measurable" hidden>
         <p class="wizard-help">Add one or more success measures. Each can have its own target and unit.</p>
+        <label class="field"><span>Track progress with</span><select class="select" id="gProgressSource"><option value="checklist">Checklist</option><option value="measure">Success measures</option><option value="habit">Linked habit</option></select></label>
+        <div id="habitProgressFields" hidden><label class="field"><span>Habit</span><select class="select" id="gHabit"></select></label><label class="field"><span>Completed days target</span><input class="input" id="gHabitTarget" type="number" min="1" step="1" value="24"></label><p class="wizard-help">Automatically counted from Habittify within your goal dates. Each day counts once.</p></div>
         <div id="wizardMeasures"></div>
         <button type="button" class="btn-ghost" id="addMeasureBtn">＋ Add measure</button>
       </div>
 
       <div class="wizard-panel" data-panel="achievable" hidden>
         <p class="wizard-help">Break the goal into small, doable tasks. Add at least one.</p>
+        <p id="habitPlanHelp" class="wizard-help" hidden>Your habit is your daily action. Record it in Habittify; progress updates automatically.</p>
         <div class="task-editor">
           <input class="input" id="taskTitle" maxlength="150" placeholder="First task — e.g., pick a race">
           <button type="button" class="btn-ghost" id="addTaskBtn">＋ Add</button>
@@ -170,10 +173,11 @@
       </div>
     </section>
 
+    <section id="habitMilestones" class="habit-milestones" hidden></section>
     <section class="smart-summary" id="smartSummary"></section>
     <section class="measures-section" id="detailMeasures" aria-label="Goal measures"></section>
 
-    <section class="tasks-section">
+    <section class="tasks-section" id="detailTaskSection">
       <h4>Tasks</h4>
       <form class="add-task-row" id="addTaskForm">
         <input class="input" id="newTaskInput" maxlength="150" placeholder="Add a task…" required>
@@ -189,6 +193,7 @@
   </dialog>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/scripts/app.js?v=cards-2" defer></script>
+  <script src="/assets/goal-progress.js?v=1" defer></script>
+  <script src="assets/scripts/app.js?v=habit-progress-1" defer></script>
 </body>
 </html>

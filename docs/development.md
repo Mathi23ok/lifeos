@@ -76,3 +76,9 @@ Use the disposable fixture server described above. These checks do not verify pr
 - Deploy revision-aware state handling and its browser client together.
 - Keep real configuration, tokens, fixtures, and private uploads out of Git.
 - Use a disposable database for destructive integration checks.
+
+## Focus soundtrack
+
+`public_html/assets/focus-audio.js` owns the Focus playlist and audio lifecycle. Users select built-in tracks in a collapsed checkbox picker; selections play in the order they were chosen, advance on `ended`, and repeat the queue. A single selected track repeats itself. Play/Pause resumes the same track position; Next advances without starting playback when paused. Removing the current track advances during playback; removing all tracks stops it.
+
+Built-in selection order and volume are saved as `soundtrack: {tracks: string[], volume: number}` within the existing `edi_focus_v1` document, preserving timer/history fields. New users keep the original first-track default. Multiple local files can be appended via the file picker. Blob URLs remain session-only and are revoked when the page is unloaded, so file bytes and temporary URLs are never sent to the state API. Failed tracks are skipped once per playback attempt; if every selected track fails, playback pauses with a retry message. Autoplay restrictions require a user Play action.

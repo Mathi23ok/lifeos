@@ -806,3 +806,5 @@ textarea { resize: vertical; min-height: 70px; line-height: 1.55; }
 .goal-open>span{font-size:15px;color:var(--accent)}
 .measures-section{margin-inline:28px}
 @media(max-width:720px){.app-container{padding:24px 16px 40px}.stats-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat-card{padding:14px 12px;gap:10px}.stat-card .value{font-size:22px}.stat-icon{width:32px;height:32px;flex-basis:32px}.goal-card{padding:20px}.header-actions{gap:8px}.header-actions .btn-primary{flex:1}.measures-section{margin-inline:18px}}
+
+[hidden]{display:none!important}.habit-milestones{display:grid;gap:14px;margin:20px 0}.habit-milestones a{color:var(--accent);font-size:14px}.habit-milestones>div{display:flex;gap:8px;flex-wrap:wrap}.habit-milestones span{padding:6px 12px;border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);font-size:12px}.habit-milestones .reached{color:var(--accent);background:var(--accent-soft)}#habitProgressFields{display:grid;gap:12px;margin-top:16px}

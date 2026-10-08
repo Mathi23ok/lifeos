@@ -23,7 +23,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="assets/styles/style.css?v=trello-9" />
+    <link rel="stylesheet" href="assets/styles/style.css?v=move-1" />
   </head>
   <body>
     <div class="aurora" aria-hidden="true">
@@ -113,7 +113,7 @@
           <select id="cardList" aria-label="Card list"></select>
           <div class="trello-top-actions">
             <button type="button" data-editor-target="cardAttachmentsSection" aria-label="Card attachments"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1"/><path d="m5 18 5-6 3 3 3-4 3 7"/></svg></button>
-            <details class="editor-more"><summary aria-label="More card actions">⋯</summary><div><button type="button" id="deleteCardBtn" class="menu-danger">Delete card</button></div></details>
+            <details class="editor-more"><summary aria-label="More card actions">⋯</summary><div><button type="button" id="moveCardBtn">Move to another project</button><button type="button" id="deleteCardBtn" class="menu-danger">Delete card</button></div></details>
             <button type="button" id="closeCardModal" aria-label="Close card"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
           </div>
         </header>
@@ -191,7 +191,18 @@
       </form>
     </dialog>
 
+    <dialog class="move-card-modal" id="moveCardModal" aria-labelledby="moveCardTitle">
+      <form id="moveCardForm">
+        <header><div><p class="move-card-kicker">CARD ACTION</p><h2 id="moveCardTitle">Move to another project</h2></div><button type="button" id="closeMoveCard" aria-label="Close move card">×</button></header>
+        <p id="moveCardSummary" class="move-card-summary" dir="auto"></p>
+        <label class="field"><span>Project</span><select id="moveCardProject" class="input" required></select></label>
+        <label class="field"><span>List</span><select id="moveCardList" class="input" required></select></label>
+        <p class="move-card-hint">The card’s details, checklists, labels and attachments move with it.</p>
+        <p id="moveCardError" class="move-card-error" role="alert" hidden></p>
+        <footer><button type="button" id="cancelMoveCard" class="btn-ghost">Cancel</button><button type="submit" id="confirmMoveCard" class="btn-primary">Move card</button></footer>
+      </form>
+    </dialog>
     <div class="toast" id="toast"></div>
-    <script src="assets/scripts/app.js?v=dates-1" defer></script>
+    <script src="assets/scripts/app.js?v=move-1" defer></script>
   </body>
 </html>

@@ -751,6 +751,7 @@ function saveNewExpense() {
 }
 
 function deleteExpense(id) {
+  if (protectLinkedExpense(id)) return;
   state.expenses = state.expenses.filter((e) => e.id !== id);
   save();
   render();
@@ -885,6 +886,7 @@ function saveEditedIncome(id) {
 }
 
 function saveEditedExpense(id) {
+  if (protectLinkedExpense(id)) return;
   const catId = document.getElementById("editExpenseCategory").value;
   const desc = document.getElementById("editExpenseDesc").value.trim();
   const amount = parseFloat(document.getElementById("editExpenseAmount").value);
@@ -902,6 +904,19 @@ function saveEditedExpense(id) {
 }
 
 // ── CONTEXT MENU ──────────────────────────────────────────────────────────────
+function protectLinkedExpense(id) {
+  try {
+    const decisions = JSON.parse(appStorage.getItem('edi_obligations_v1') || '{}').decisions || {};
+    const linked = Object.entries(decisions).find(([, payment]) => payment.status === 'paid' && payment.period === activePeriod && payment.expenseId === String(id));
+    if (!linked) return false;
+    showToast('This expense is linked to a scheduled payment. Undo the payment in Financial commitments before changing it.', 'error');
+    dispatchEvent(new CustomEvent('finance-open-payment', {detail:{id:linked[0]}}));
+    return true;
+  } catch {
+    showToast('Unable to check payment links. Reload before changing this expense.', 'error');
+    return true;
+  }
+}
 let activeContextTarget = null;
 
 function showContextMenu(e, type, id) {
@@ -1162,6 +1177,7 @@ function openEditIncomeModal(id) {
 }
 
 function openEditExpenseModal(id) {
+  if (protectLinkedExpense(id)) return;
   const exp = state.expenses.find((e) => e.id === id);
   if (!exp) return;
   const catOptions = state.categories
@@ -1245,7 +1261,7 @@ function render() {
     tbody.innerHTML = sorted
       .map((e) => {
         const cat = state.categories.find((c) => c.id === e.categoryId);
-        return `<tr class="fade-in row-item" style="border-top:1px solid var(--ink-line);" onclick="showContextMenu(event,'expense','${e.id}')">
+        return `<tr class="fade-in row-item" data-expense-id="${esc(e.id)}" style="border-top:1px solid var(--ink-line);" onclick="showContextMenu(event,'expense','${e.id}')">
         <td style="padding:11px 0;font-size:11px;color:var(--muted);">${cat ? esc(cat.label.substring(0, 14)) : esc(e.categoryId)}</td>
         <td style="padding:11px 4px;font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.desc) || "—"}</td>
         <td class="num" style="padding:11px 0;text-align:end;font-size:12px;">${fmt(e.amount)}</td>
@@ -1531,3 +1547,17 @@ render();
 renderPerfStrip();
 window.addEventListener("resize", renderPerfStrip);
 initReveal();
+// Adopt atomic payment results and changes from other workspaces without writing
+// an old in-memory ledger back over the newly committed expense.
+addEventListener('app-storage-change', () => {
+  try {
+    const incoming = JSON.parse(appStorage.getItem(PERIODS_STORAGE_KEY) || 'null');
+    if (!incoming || !Object.keys(incoming).length) return;
+    const selected = appStorage.getItem(ACTIVE_PERIOD_KEY) || activePeriod;
+    if (JSON.stringify(incoming) === JSON.stringify(periods) && selected === activePeriod) return;
+    periods = incoming;
+    activePeriod = periods[selected] ? selected : Object.keys(periods)[0];
+    state = cloneState(normalizeState(periods[activePeriod]));
+    render();
+  } catch { showToast('Unable to refresh the ledger. Reload before editing.', 'error'); }
+});

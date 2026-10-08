@@ -1,168 +1,199 @@
+<div align="center">
+
 # Edi Life OS
 
-**A personal workspace for focus, habits, finances, and meaningful progress.**
+**One self-hosted home for your focus, habits, goals, money and projects — with an MCP server so your AI assistant can work alongside you.**
 
-Edi Life OS brings everyday planning into one private dashboard. Manage projects, build small habits, track money, and keep your notes close—with a shared visual style across every page.
+[![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4?logo=php&logoColor=white)](#requirements) [![MySQL 8](https://img.shields.io/badge/MySQL-8-4479a1?logo=mysql&logoColor=white)](#requirements) [![MCP server](https://img.shields.io/badge/MCP-26_tools-39e6ad)](#talk-to-your-life-os-with-ai) [![No build step](https://img.shields.io/badge/frontend-no_build_step-f3c969)](#quick-start) [![Self-hosted](https://img.shields.io/badge/data-self--hosted-e9918c)](#your-data-stays-yours)
 
-Built with PHP, MySQL, and vanilla JavaScript. The browser application requires no frontend build step.
+[Quick start](#quick-start) · [Tour](#a-quick-tour) · [AI / MCP](#talk-to-your-life-os-with-ai) · [Deploy](docs/deployment.md) · [API](docs/api.md)
 
-![Edi Life OS dashboard preview](intro-preview.gif)
+<br>
 
-[Features](#features) · [Getting started](#getting-started) · [API](#api-and-integrations) · [Development](docs/development.md) · [Deployment](docs/deployment.md)
+<img src="docs/media/dashboard.webp" alt="Edi Life OS overview: a daily productivity score with focus, habit, goal and work progress, and six life dimensions" width="100%">
 
-## Features
+</div>
+
+<br>
+
+Most of us run our lives across a to-do app, a habit tracker, a budgeting spreadsheet, a Pomodoro timer and a notes app — and none of them know about each other. **Edi Life OS puts all of it in one calm, private dashboard** and connects the small things you do today to the direction you want your life to take.
+
+- **Everything in one place.** Ten workspaces share one design, one sign-in and one database.
+- **Connected, not just collected.** Habits drive goal progress, Kanban cards show up in the calendar, and the Overview turns it all into one daily score.
+- **Yours.** Runs on any PHP + MySQL host, even cheap shared hosting. No subscription, no tracking, no vendor lock-in.
+- **AI-ready.** A built-in MCP server lets Claude and other assistants read your dashboard, plan goals, log habits and track expenses for you.
+
+## A quick tour
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/media/growth.webp" alt="Growth workspace with six life dimensions and SMART progress">
+<p><b>Growth</b> — Six life dimensions, each linked to long-term goals, SMART goals, habits and tasks. Guided weekly, monthly and quarterly reviews.</p>
+</td>
+<td width="50%" valign="top">
+<img src="docs/media/focus.webp" alt="Focus timer over an illustrated landscape with a soundtrack panel">
+<p><b>Focus</b> — Pomodoro sessions with breaks, a built-in focus soundtrack and a landscape that follows the time of day.</p>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/media/habittify.webp" alt="Habit checklist with a seven-day completion chart">
+<p><b>Habittify</b> — Small daily habits, streaks and a seven-day picture of your consistency.</p>
+</td>
+<td width="50%" valign="top">
+<img src="docs/media/kanban.webp" alt="Kanban board with backlog, in progress, review and done columns">
+<p><b>Kanban</b> — Boards with labels, priorities, due dates, checklists, comments and attachments.</p>
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>All ten workspaces</b></summary>
+
+<br>
 
 | Workspace | What you can do |
 | --- | --- |
-| **Overview** | See focus activity, habit progress, goals, finances, and a seven-day weather forecast. |
-| **Focus** | Work in timed sessions with short and long breaks, progress tracking, and session history. |
-| **Finance** | Track expenses, income streams, and budgets in Toman, with searchable categories and period-based records. |
-| **Habittify** | Maintain daily habits and follow completion, streaks, and monthly progress. |
-| **Kanban** | Organize projects with draggable cards and lists, priorities, labels, dates, checklists, comments, and file attachments. Move cards between projects. |
-| **Calendar** | View due cards across all boards in Month or Schedule view, with search, board filters, and overdue items. |
-| **Goals** | Plan SMART goals with multiple measures, deadlines, priorities, and sortable task checklists. |
-| **Notepad** | Write Markdown notes with editing, preview, and export. |
-| **Notes** | Arrange sticky notes with colors, fonts, and connections. |
-| **Settings** | Change the theme and manage your sign-in credentials. |
+| **Overview** | A live productivity score, focus and habit trends, goals, finances and a seven-day weather forecast. |
+| **Growth** | Connect six life dimensions to long-term goals, SMART goals, habits and tasks. Run weekly, monthly or quarterly reviews. [Guide](docs/growth.md) |
+| **Focus** | Timed sessions with short and long breaks, session history and a focus soundtrack. |
+| **Finance** | Expenses, income and budgets in Toman. Recurring payments, subscriptions, installments and debts with a monthly commitments view. [Guide](docs/financial-commitments.md) |
+| **Habittify** | Daily habits with completion, streaks and monthly progress. |
+| **Kanban** | Draggable cards and lists with priorities, labels, dates, checklists, comments and file attachments. |
+| **Calendar** | Due cards and financial dues across all boards in Month or Schedule view. |
+| **Goals** | SMART goals with measures, deadlines, priorities, checklists — or progress driven by a habit. |
+| **Notepad** | Markdown notes with preview and export. |
+| **Notes** | Sticky notes with colors, fonts and connections. |
 
-Calendar uses **Asia/Tehran** for dates and overdue status. Selecting an event opens its original Kanban card.
+Dates follow **Asia/Tehran**. The weather card shows Qeshm Island via Open-Meteo; its tide figure is a modeled estimate, not for navigation.
 
-The weather card shows current conditions and a seven-day forecast for Qeshm Island through Open-Meteo. Its tide information is a modeled coastal estimate and is unsuitable for navigation. Weather requires PHP cURL and outbound HTTPS access.
+</details>
 
-## Requirements
+## Talk to your Life OS with AI
 
-| Component | Requirement |
-| --- | --- |
-| PHP | **8.1+**, with `pdo_mysql` and `mbstring` |
-| Database | **MySQL 8+**; also tested with MariaDB 10.4 |
-| Web server | PHP development server locally; Apache with rewrite support for hosting |
-| Weather | PHP `curl` extension and outbound HTTPS access |
-| MCP server | Optional: **Node.js 22.9+** and npm |
-| PHP API tests | Optional: `pdo_sqlite` in addition to the application extensions |
+Edi Life OS ships with an optional [MCP](https://modelcontextprotocol.io) server that exposes **26 tools** across your dashboard, goals, tasks, habits, finances and notes. Connect it to Claude Desktop, Claude Code or any MCP client and ask in plain language:
 
-## Getting started
+> *"Show me my LifeOS dashboard."*
+>
+> *"Create a SMART goal called Build a home studio, due in three months, and add Buy acoustic panels as a task."*
+>
+> *"Mark Reading complete for today."*
+>
+> *"Log a 450,000 Toman food expense and show my balance."*
 
-### 1. Get the source
+The MCP server talks to your app only through its token-protected HTTP API. It never touches your database or credentials. Setup takes a minute — see [MCP server](#mcp-server) below.
+
+## Quick start
+
+You need **PHP 8.1+** (with `pdo_mysql` and `mbstring`) and **MySQL 8+** (or MariaDB 10.4+).
 
 ```sh
 git clone https://github.com/edrisranjbar/lifeos.git
 cd lifeos
+cp config.example.php config.php   # PowerShell: Copy-Item config.example.php config.php
 ```
 
-### 2. Configure the application
-
-Copy the example configuration:
-
-```sh
-cp config.example.php config.php
-```
-
-On Windows PowerShell:
-
-```powershell
-Copy-Item config.example.php config.php
-```
-
-Edit `config.php` with your database connection and initial app username and password. Use an account that can create the database and application tables, or arrange those privileges with your database administrator.
-
-**Keep real credentials in the ignored `config.php`. Never commit them.**
-
-### 3. Start the local server
-
-From the repository root:
+Edit `config.php` with your database connection and the username and password you want to sign in with, then start the server:
 
 ```sh
 php -S localhost:8000 -t public_html server.php
 ```
 
-Open [localhost:8000](http://localhost:8000) and sign in with the credentials you configured. The backend creates its database and tables on first database access.
+Open [localhost:8000](http://localhost:8000) and sign in. The database and tables are created on first use. You can change your sign-in later in **Settings**.
 
-### 4. Manage your sign-in
+> [!IMPORTANT]
+> `config.php` holds real credentials and is gitignored. Never commit it.
 
-The configured login seeds the `app_credentials` table on first use. After that, change your username or password in **Settings → Sign-in credentials**. Passwords are hashed in MySQL; changing credentials signs out other sessions.
+Hosting on Apache or shared hosting? Follow the [deployment guide](docs/deployment.md).
 
-For Apache and shared hosting, follow the [deployment guide](docs/deployment.md).
+### Requirements
 
-## Data and persistence
-
-Application state is stored in MySQL. Habits and completion logs use dedicated tables; other workspaces use JSON documents in `app_state`.
-
-- Existing browser data is imported once. Conflicting older copies are archived as `legacy_backup_*` records.
-- Browser saves use revision checks to protect against stale changes. If a conflict occurs, preserve your unsaved edits and reload.
-- API mutations use transactions and row locks. Reload the browser after changes made through an external client.
-- Back up the database, private attachment files, and deployment configuration together.
-
-Migrating an existing Habittify SQLite database? Follow the [migration instructions](docs/deployment.md#migrating-habittify-from-sqlite) before opening Habittify against the new database.
+| Component | Requirement |
+| --- | --- |
+| PHP | **8.1+** with `pdo_mysql` and `mbstring` |
+| Database | **MySQL 8+**; also tested with MariaDB 10.4 |
+| Web server | PHP's built-in server locally; Apache with rewrites for hosting |
+| Weather | PHP `curl` and outbound HTTPS |
+| MCP server | Optional: **Node.js 22.9+** |
+| API tests | Optional: `pdo_sqlite` |
 
 ## API and integrations
 
 ### HTTP API
 
-The private `/api/v1` API provides access to dashboard context, goals, tasks, habits, finances, and sticky notes. It uses a dedicated bearer token independent of browser sign-in.
-
-Generate a token:
+A private `/api/v1` API covers the dashboard, goals, tasks, habits, finances and sticky notes. It uses its own bearer token, separate from your browser sign-in.
 
 ```sh
 php -r "echo bin2hex(random_bytes(32));"
 ```
 
-Set it as `api_token` in the ignored server configuration, or as the PHP process environment variable `LIFEOS_API_TOKEN`. Configure the same token in your client environment.
-
-Example request in a POSIX shell:
+Set the result as `api_token` in `config.php` (or the `LIFEOS_API_TOKEN` environment variable), then:
 
 ```sh
-curl -H "Authorization: Bearer $LIFEOS_API_TOKEN" \
-  https://example.com/api/v1/dashboard
+curl -H "Authorization: Bearer $LIFEOS_API_TOKEN" https://your-host/api/v1/dashboard
 ```
 
-Use your own application URL. See the [API reference](docs/api.md) for authentication, endpoints, payloads, and error handling.
+See the [API reference](docs/api.md) for endpoints, payloads and errors.
 
 ### MCP server
-
-The optional Node.js MCP server exposes application tools over **stdio** and calls the HTTP API. It does not require database credentials.
 
 ```sh
 cd mcp
 npm ci
-cp .env.example .env
-# Set LIFEOS_BASE_URL and LIFEOS_API_TOKEN in .env
+cp .env.example .env   # set LIFEOS_BASE_URL and LIFEOS_API_TOKEN
 npm start
 ```
 
-On Windows, use `Copy-Item .env.example .env`. See the [MCP guide](mcp/README.md) for available tools and client configuration.
+The server runs over **stdio**; there is no hosted MCP endpoint. The [MCP guide](mcp/README.md) lists every tool and shows client configuration for Claude and Codex.
 
-There is no remotely hosted MCP HTTP endpoint. The application API URL is not an MCP transport URL.
+## Your data stays yours
+
+- Everything lives in **your** MySQL database. Habits use dedicated tables; other workspaces store JSON documents in `app_state`.
+- Saves use revision checks, so a stale tab can't silently overwrite newer changes. API writes use transactions and row locks.
+- Data from older browser-only versions is imported once; conflicting copies are archived as `legacy_backup_*` records.
+- Back up the database, attachment files and your configuration together.
+
+Moving from the old Habittify SQLite database? See [migrating Habittify](docs/deployment.md#migrating-habittify-from-sqlite).
+
+## Security
+
+Edi Life OS is built for a **single owner**.
+
+- The API token grants read and write access to every supported domain. Token scopes and app-level rate limiting are not implemented, so set request limits at the hosting layer.
+- Use HTTPS anywhere other than localhost, and keep tokens out of URLs, frontend code, screenshots and logs.
+- Secret notes are hidden from API reads by default. The secret flag controls visibility; it is not separate encryption.
 
 ## Project structure
 
 ```text
-public_html/          Browser pages, assets, and Apache entry points
-lib/                  API domains, response helpers, and state transactions
+public_html/          Browser workspaces, shared assets and Apache entry points
+lib/                  API domains, response helpers and state transactions
 mcp/                  Optional Node.js stdio MCP server
-tests/                Timer, API, MySQL, and integration checks
-docs/                 API, development, and deployment guides
-config.example.php    Configuration template without real credentials
-server.php            PHP development router and application routing
+tests/                Timer, API, MySQL and integration checks
+docs/                 Guides, plus README screenshots in docs/media
+config.example.php    Configuration template (no real credentials)
+server.php            Development router and application routing
 api.php               HTTP API entry point
 ```
 
-## Development
-
-See the [development guide](docs/development.md) for local checks and an isolated MySQL integration workflow.
-
-The test fixtures use disposable data and do not load the repository's production configuration. Running tests locally does not establish compatibility with a particular hosting environment.
-
-## Security
-
-Edi Life OS is designed for a **single owner**. The API token grants read and write access to its supported domains; token scopes and application-level rate limiting are not implemented.
-
-Use HTTPS outside localhost. Keep tokens out of URLs, frontend code, screenshots, and logs, and configure request limits at the hosting layer.
-
-Secret notes are hidden from API reads by default. Their secret flag controls visibility; it does not provide separate encrypted storage.
+Built with PHP, MySQL and vanilla JavaScript — no frontend build step, no framework.
 
 ## Documentation
 
-- [API reference](docs/api.md) — authentication, routes, data formats, and concurrency.
-- [MCP guide](mcp/README.md) — tools, environment settings, and client setup.
-- [Deployment guide](docs/deployment.md) — Apache, shared hosting, backups, and migration.
-- [Development guide](docs/development.md) — local checks and disposable integration fixtures.
+- [API reference](docs/api.md) — authentication, routes, data formats and concurrency
+- [MCP guide](mcp/README.md) — tools, environment settings and client setup
+- [Deployment guide](docs/deployment.md) — Apache, shared hosting, backups and migration
+- [Development guide](docs/development.md) — local checks and disposable integration fixtures
+- [Growth workspace](docs/growth.md) · [Financial commitments](docs/financial-commitments.md)
+
+## Contributing
+
+Ideas, bug reports and pull requests are welcome. Open an [issue](https://github.com/edrisranjbar/lifeos/issues) to start a conversation, and see the [development guide](docs/development.md) to run the checks locally.
+
+<div align="center">
+<br>
+
+**If Edi Life OS helps you run your days, consider giving it a ⭐ — it helps others find it.**
+
+</div>
