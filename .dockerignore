@@ -1,0 +1,10 @@
+# Allow-list: only the application goes into the image. Local secrets,
+# backups, tests, the MCP server and media never leave this machine.
+*
+!*.php
+!public_html/
+!lib/
+!docker/
+config.php
+config.test.php
+public_html/habittify/storage/*.db*

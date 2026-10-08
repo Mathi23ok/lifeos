@@ -1,0 +1,45 @@
+# Run Edi Life OS with MySQL:
+#   cp .env.example .env   (then set your sign-in and passwords; all four are required)
+#   docker compose up -d
+# Open http://localhost:8080
+services:
+  app:
+    build: .
+    image: lifeos
+    restart: unless-stopped
+    ports:
+      - "${LIFEOS_PORT:-8080}:80"
+    environment:
+      LIFEOS_DB_HOST: db
+      LIFEOS_DB_NAME: lifeos
+      LIFEOS_DB_USER: lifeos
+      LIFEOS_DB_PASSWORD: ${LIFEOS_DB_PASSWORD:?}
+      LIFEOS_USERNAME: ${LIFEOS_USERNAME:?}
+      LIFEOS_PASSWORD: ${LIFEOS_PASSWORD:?}
+      LIFEOS_API_TOKEN: ${LIFEOS_API_TOKEN:-}
+      TZ: Asia/Tehran
+    volumes:
+      - attachments:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: lifeos
+      MYSQL_USER: lifeos
+      MYSQL_PASSWORD: ${LIFEOS_DB_PASSWORD:?}
+      MYSQL_ROOT_PASSWORD: ${LIFEOS_DB_ROOT_PASSWORD:?}
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u lifeos -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mysql:
+  attachments:
