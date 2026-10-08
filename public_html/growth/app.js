@@ -1,5 +1,6 @@
 import {KEY, dimensions, array, documentState, sources, habitData, summary, goalProgress, today, nextReview} from '../assets/growth-model.js';
 import {createReviewStepper} from './review-stepper.js?v=1';
+import {shareReviewImage} from './share-image.js?v=1';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const prettyDate=value=>value && !Number.isNaN(new Date(value+'T12:00:00Z').getTime())?new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z')):'No target date';
@@ -24,6 +25,14 @@ function navigate(page, item={}) {
 const shortDate=value=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
 const capital=value=>String(value||'').replace(/^./,c=>c.toUpperCase());
 const pct=value=>value===null||value===undefined?'—':`${value}%`;
+const shareIcon='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>';
+async function shareReview(id,button) {
+  const review=doc.reviews.find(r=>r.id===id);if(!review)return;
+  button.disabled=true;
+  try {const result=await shareReviewImage(review,dimensions,prettyDate(review.date));if(result==='downloaded')$('status').textContent='Review image downloaded. Share it wherever you like.';}
+  catch(error){$('status').textContent=error.message||'Unable to create the review image.';}
+  finally{button.disabled=false;}
+}
 function group(title,action,rows,empty) {
   return `<section class="link-group"><header><h4>${title}</h4>${action}</header>${rows.length?`<ul>${rows.join('')}</ul>`:`<p class="link-empty">${empty}</p>`}</section>`;
 }
@@ -66,7 +75,7 @@ function render() {
   }).join(''):'<div class="empty"><strong>No long-term goals here yet.</strong><span>Start with one meaningful direction, then connect the SMART goals, habits and tasks that move it forward.</span></div>';
   $('history').innerHTML=doc.reviews.length?[...doc.reviews].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).map(r=>{
     const noted=dimensions.filter(d=>r.notes?.[d.id]?.reflection||r.notes?.[d.id]?.next);
-    return `<details class="history-entry"><summary><span class="history-name">${esc(capital(r.cadence))} review</span><span class="history-meta">${noted.length} of ${dimensions.length} reflected</span><span class="history-date">${esc(prettyDate(r.date))}</span></summary><div class="review-notes">${noted.map(d=>{const n=r.notes[d.id],s=r.snapshot?.[d.id]||{};return `<article class="review-note" style="--tone:${d.color}"><header><h3>${d.name}</h3><small>SMART ${pct(s.goalPct??null)} · Habits ${pct(s.habitPct??null)} · Tasks ${s.done??0}/${s.tasks??0}</small></header>${n.reflection?`<p dir="auto">${esc(n.reflection)}</p>`:''}${n.next?`<p class="review-next" dir="auto"><span>Next</span>${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`;
+    return `<details class="history-entry"><summary><span class="history-name">${esc(capital(r.cadence))} review</span><span class="history-meta">${noted.length} of ${dimensions.length} reflected</span><span class="history-date">${esc(prettyDate(r.date))}</span></summary><div class="history-actions"><button class="ghost share-btn" data-share="${esc(r.id)}">${shareIcon}Share as image</button><span>Scores only. Your reflections stay private.</span></div><div class="review-notes">${noted.map(d=>{const n=r.notes[d.id],s=r.snapshot?.[d.id]||{};return `<article class="review-note" style="--tone:${d.color}"><header><h3>${d.name}</h3><small>SMART ${pct(s.goalPct??null)} · Habits ${pct(s.habitPct??null)} · Tasks ${s.done??0}/${s.tasks??0}</small></header>${n.reflection?`<p dir="auto">${esc(n.reflection)}</p>`:''}${n.next?`<p class="review-next" dir="auto"><span>Next</span>${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`;
   }).join(''):'<div class="empty"><strong>No reviews yet.</strong><span>Your first review captures wins, obstacles and one practical next step for each dimension.</span></div>';
 }
 async function refresh() {
@@ -129,12 +138,15 @@ $('reviewForm').onsubmit=async event=>{
     for(const d of dimensions){notes[d.id]={reflection:String(form.get('reflection-'+d.id)||'').trim(),next:String(form.get('next-'+d.id)||'').trim()};values[d.id]=snapshot(summary(current.plans.filter(p=>p.dimensionId===d.id&&p.status!=='archived'),sources(),habit));}
     if(!Object.values(notes).some(n=>n.reflection||n.next))throw Error('Add a reflection or next step before completing your review.');
     await persist({...current,reviews:[...current.reviews,{id:crypto.randomUUID(),cadence:$('cadence').value,date:today(),createdAt:new Date().toISOString(),notes,snapshot:values}]});reviewStepper.clearDraft();$('reviewDialog').close();
+    const saved=documentState().reviews.at(-1);
+    if(saved)$('status').innerHTML=`Review saved. <button class="text-link status-share" data-share="${esc(saved.id)}">Share it as an image →</button>`;
   }catch(error){$('reviewError').textContent=error.message;}finally{reviewSaving=false;$('saveReview').disabled=false;reviewStepper.setBusy(false);}
 };
 document.addEventListener('click',event=>{
   const button=event.target.closest('button');if(!button)return;
   if(button.hasAttribute('data-close')&&!(button.closest('dialog').id==='reviewDialog'?reviewSaving:$('savePlan').disabled))button.closest('dialog').close();
   if(button.dataset.dimension){selected=button.dataset.dimension;location.hash=selected;render();}
+  if(button.dataset.share){shareReview(button.dataset.share,button);return;}
   if(button.dataset.review)openReview(button.dataset.review);
   if(button.dataset.edit)openPlan(button.dataset.edit);
   if(button.dataset.page)navigate(button.dataset.page);
