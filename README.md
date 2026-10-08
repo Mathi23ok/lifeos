@@ -4,7 +4,7 @@
 
 **One self-hosted home for your focus, habits, goals, money and projects — with an MCP server so your AI assistant can work alongside you.**
 
-[![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4?logo=php&logoColor=white)](#requirements) [![MySQL 8](https://img.shields.io/badge/MySQL-8-4479a1?logo=mysql&logoColor=white)](#requirements) [![MCP server](https://img.shields.io/badge/MCP-26_tools-39e6ad)](#talk-to-your-life-os-with-ai) [![No build step](https://img.shields.io/badge/frontend-no_build_step-f3c969)](#quick-start) [![Self-hosted](https://img.shields.io/badge/data-self--hosted-e9918c)](#your-data-stays-yours)
+[![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4?logo=php&logoColor=white)](#requirements) [![MySQL 8](https://img.shields.io/badge/MySQL-8-4479a1?logo=mysql&logoColor=white)](#requirements) [![MCP server](https://img.shields.io/badge/MCP-26_tools-39e6ad)](#talk-to-your-life-os-with-ai) [![Docker](https://img.shields.io/badge/docker-compose_up-2496ed?logo=docker&logoColor=white)](#with-docker-recommended) [![Self-hosted](https://img.shields.io/badge/data-self--hosted-e9918c)](#your-data-stays-yours)
 
 [Quick start](#quick-start) · [Tour](#a-quick-tour) · [AI / MCP](#talk-to-your-life-os-with-ai) · [Deploy](docs/deployment.md) · [API](docs/api.md)
 
@@ -86,6 +86,22 @@ The MCP server talks to your app only through its token-protected HTTP API. It n
 
 ## Quick start
 
+### With Docker (recommended)
+
+```sh
+git clone https://github.com/edrisranjbar/lifeos.git && cd lifeos
+cp .env.example .env    # set your sign-in and passwords
+docker compose up -d
+```
+
+Open [localhost:8080](http://localhost:8080) and sign in. MySQL, the app and your attachments each live in their own volume, so `docker compose up -d --build` after a `git pull` upgrades without losing data.
+
+### On shared hosting
+
+Download `lifeos-<version>.zip` from the [latest release](https://github.com/edrisranjbar/lifeos/releases/latest) and extract it into your hosting **home directory**, so `public_html/` becomes your web root and the backend sits safely above it. Copy `config.example.php` to `config.php`, fill in your MySQL details, and open your site. See the [deployment guide](docs/deployment.md) for details.
+
+### With PHP locally
+
 You need **PHP 8.1+** (with `pdo_mysql` and `mbstring`) and **MySQL 8+** (or MariaDB 10.4+).
 
 ```sh
@@ -103,9 +119,7 @@ php -S localhost:8000 -t public_html server.php
 Open [localhost:8000](http://localhost:8000) and sign in. The database and tables are created on first use. You can change your sign-in later in **Settings**.
 
 > [!IMPORTANT]
-> `config.php` holds real credentials and is gitignored. Never commit it.
-
-Hosting on Apache or shared hosting? Follow the [deployment guide](docs/deployment.md).
+> `config.php` and `.env` hold real credentials and are gitignored. Never commit them.
 
 ### Requirements
 
@@ -178,6 +192,8 @@ api.php               HTTP API entry point
 ```
 
 Built with PHP, MySQL and vanilla JavaScript — no frontend build step, no framework.
+
+`Dockerfile`, `docker-compose.yml` and `docker/config.php` run the app with configuration from environment variables.
 
 ## Documentation
 

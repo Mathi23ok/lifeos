@@ -1,0 +1,37 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: |
+          # Throwaway credentials, generated per run.
+          CI_PASS=$(openssl rand -hex 16)
+          echo "CI_PASS=$CI_PASS" >> "$GITHUB_ENV"
+          cp .env.example .env
+          sed -i "s/^LIFEOS_USERNAME=.*/LIFEOS_USERNAME=ci-user/; s/^LIFEOS_PASSWORD=.*/LIFEOS_PASSWORD=$CI_PASS/" .env
+          docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Sign in and load state
+        run: |
+          base=http://localhost:8080
+          curl -fsS -o /dev/null "$base/login.php"
+          status=$(curl -s -o /dev/null -w '%{http_code}' -c jar -b jar \
+            --data-urlencode username=ci-user --data-urlencode "password=$CI_PASS" "$base/login.php")
+          echo "login status: $status"
+          [ "$status" = 302 ] || [ "$status" = 303 ]
+          curl -fsS -b jar "$base/state.php" | grep -q '"csrf"'
+          curl -fsS -b jar "$base/" | grep -q 'Edi Life OS'
+          echo "Signed in and loaded state through Apache + MySQL"
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs

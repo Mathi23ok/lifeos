@@ -2,6 +2,33 @@
 
 [← Project overview](../README.md)
 
+## Docker
+
+`docker-compose.yml` runs the app (PHP 8.3 + Apache) with MySQL 8.4:
+
+```sh
+cp .env.example .env    # set LIFEOS_USERNAME, LIFEOS_PASSWORD and both database passwords
+docker compose up -d
+```
+
+The app listens on `LIFEOS_PORT` (default 8080). Configuration comes from environment variables through `docker/config.php`, so no `config.php` is needed. Set `LIFEOS_API_TOKEN` to enable the HTTP API and MCP server; leave it empty to disable the API.
+
+Data lives in two named volumes: `mysql` (the database) and `attachments` (Kanban files). Back up both. To upgrade, `git pull` and run `docker compose up -d --build`.
+
+Put a TLS-terminating reverse proxy (Caddy, Traefik, nginx) in front of the container before exposing it to the internet.
+
+## Shared hosting release zip
+
+Each tagged release publishes `lifeos-<version>.zip` on GitHub Releases, built with `git archive` (development files are excluded via `.gitattributes`). Its layout matches typical cPanel hosting:
+
+1. Extract the zip into your hosting **home directory**. `public_html/` becomes the web root; `config.php`, `lib/` and the PHP backend stay above it, out of public reach.
+2. Copy `config.example.php` to `config.php` and enter your MySQL details and initial sign-in.
+3. Open your site and sign in. Tables are created on first use.
+
+If your host already has a `public_html` with other content, back it up first. To build the zip yourself: `git archive --format=zip -o lifeos.zip HEAD`.
+
+To publish a release, push a version tag: `git tag v1.0.0 && git push origin v1.0.0`.
+
 ## Standard Apache hosting
 
 1. Install the [required PHP extensions](../README.md#requirements) and configure MySQL.
