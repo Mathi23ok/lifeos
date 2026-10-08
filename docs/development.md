@@ -23,6 +23,7 @@ Tests never load the repository config.php or production credentials:
 ```sh
 node --test tests/timer.test.mjs
 php tests/api_test.php
+php tests/obligations_test.php
 cd mcp && npm test
 ```
 
