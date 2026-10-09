@@ -37,7 +37,8 @@ function load() {
     const raw = appStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.goals)) state.goals = parsed.goals.map(goal => ({...goal, measures: goalMeasures(goal)}));
+      // Goals saved without a checklist would otherwise break rendering.
+      if (Array.isArray(parsed.goals)) state.goals = parsed.goals.map(goal => ({...goal, tasks: Array.isArray(goal.tasks) ? goal.tasks : [], measures: goalMeasures(goal)}));
     }
     const drafts = appStorage.getItem(DRAFTS_KEY);
     if (drafts) {
