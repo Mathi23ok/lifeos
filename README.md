@@ -209,7 +209,7 @@ Built with PHP, MySQL and vanilla JavaScript — no frontend build step, no fram
 
 ## Contributing
 
-Ideas, bug reports and pull requests are welcome. Open an [issue](https://github.com/edrisranjbar/lifeos/issues) to start a conversation, and see the [development guide](docs/development.md) to run the checks locally.
+Ideas, bug reports and pull requests are welcome. Read the [contributing guide](CONTRIBUTING.md) to get set up, and look for [`good first issue`](https://github.com/edrisranjbar/lifeos/labels/good%20first%20issue) if you want somewhere to start.
 
 <div align="center">
 <br>
