@@ -23,7 +23,6 @@ Then open [localhost:8080](http://localhost:8080). If you prefer plain PHP 8.1+ 
 php -S localhost:8000 -t public_html server.php
 ```
 
-
 ## Run the checks
 
 ```sh
@@ -32,7 +31,8 @@ php tests/api_test.php
 php tests/obligations_test.php
 npm ci --prefix mcp && npm test --prefix mcp
 ```
-These same checks also run automatically in GitHub Actions on every pull request and every push to main.
+
+These same checks also run automatically in GitHub Actions on every pull request and every push to `main`.
 
 The PHP tests use an in-memory SQLite database (PHP `pdo_sqlite` and `mbstring` are required) and never touch your `config.php`. See the [development guide](docs/development.md) for MySQL integration tests.
 
