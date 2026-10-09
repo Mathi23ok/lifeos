@@ -111,7 +111,6 @@ export async function renderReviewImage(review, dimensions, dateLabel) {
     ctx.font = `400 21px ${FONT}`;
     const parts = [];
     if (snap.habitPct !== null && snap.habitPct !== undefined) parts.push(`Habits ${snap.habitPct}%`);
-    if (snap.tasks) parts.push(`${snap.done ?? 0}/${snap.tasks} tasks`);
     ctx.fillText(fitText(ctx, parts.join(' · ') || 'Not measured yet', maxText), tx, cy + 48);
   });
 
