@@ -1,0 +1,65 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please don't include passwords, API tokens or private data. For security problems, use **Report a vulnerability** on the Security tab instead of a public issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Finance → Debts & credits
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where?
+      options:
+        - Overview
+        - Growth
+        - Goals
+        - Habittify
+        - Focus
+        - Finance
+        - Kanban
+        - Calendar
+        - Notepad / Notes
+        - Settings / sign-in
+        - API
+        - MCP server
+        - Install (Docker / shared hosting)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker Compose
+        - Shared hosting (release zip)
+        - PHP built-in server (local)
+        - Other
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v1.0.0, or a commit hash
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, logs or browser console errors
+      description: Optional. Remove any personal data first.

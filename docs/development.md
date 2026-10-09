@@ -4,7 +4,7 @@
 
 ## Local application
 
-Configure the application following [Getting started](../README.md#getting-started), then run:
+Configure the application following [Quick start](../README.md#quick-start), then run:
 
 ```sh
 php -S localhost:8000 -t public_html server.php
