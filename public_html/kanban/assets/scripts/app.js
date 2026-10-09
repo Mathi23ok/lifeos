@@ -339,7 +339,7 @@ function getColumn(boardId, columnId) {
 }
 
 // Inline edit helpers
-function startInlineEdit(element, currentValue, onSave) {
+function startInlineEdit(element, currentValue, onSave, onCancel) {
   // Remove any existing inline edit
   stopInlineEdit();
 
@@ -371,15 +371,21 @@ function startInlineEdit(element, currentValue, onSave) {
   blinkInterval = setInterval(blink, 300);
   input._blinkInterval = blinkInterval;
 
+  // Removing the input can fire blur, so only finish once.
+  let finished = false;
   const finish = (save) => {
+    if (finished) return;
+    finished = true;
     clearInterval(blinkInterval);
-    if (save && onSave) {
-      onSave(input.value.trim());
-    } else {
-      element.textContent = currentValue || '';
-    }
     if (input.parentNode) {
       input.remove();
+    }
+    if (save && onSave) {
+      onSave(input.value.trim());
+    } else if (!save && onCancel) {
+      onCancel();
+    } else {
+      element.textContent = currentValue || '';
     }
   };
 
@@ -389,6 +395,8 @@ function startInlineEdit(element, currentValue, onSave) {
       e.preventDefault();
       finish(true);
     } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
       finish(false);
     }
   });
@@ -727,21 +735,21 @@ function renderBoardContent() {
       setTimeout(() => {
         const newCardEl = document.querySelector(`[data-card-id="${newCard.id}"] .card-title`);
         if (newCardEl) {
+          // Escape or an empty title discards the card that was just created.
+          const discard = () => {
+            column.cards = column.cards.filter(c => c.id !== newCard.id);
+            saveState();
+            render();
+          };
           startInlineEdit(newCardEl, '', (newValue) => {
-            if (newValue) {
-              newCard.title = newValue;
-              newCardEl.textContent = newValue;
-              saveState();
-            } else {
-              newCard.title = 'Untitled';
-              newCardEl.textContent = 'Untitled';
-              saveState();
-            }
-          });
+            if (!newValue) { discard(); return; }
+            newCard.title = newValue;
+            newCardEl.textContent = newValue;
+            saveState();
+            showToast('Card added', 'success');
+          }, discard);
         }
       }, 50);
-
-      showToast('Card added', 'success');
     });
 
     const actionsButton = colEl.querySelector('.column-actions');
