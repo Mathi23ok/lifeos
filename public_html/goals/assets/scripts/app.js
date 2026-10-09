@@ -280,36 +280,19 @@ function renderGoals() {
   });
 }
 
+// Compact card: title, progress and when it's due. Everything else lives in the goal's detail view.
 function goalCardHTML(g, index = 0) {
   const status = effectiveStatus(g);
   const progress = calcProgress(g);
-  const completedCount = g.tasks.filter((t) => t.done).length;
-  const measures = g.progressSource === "habit" ? [] : goalMeasures(g);
-  const nextTask = g.tasks.find(task => !task.done);
   const priority = ['low', 'medium', 'high'].includes(g.priority) ? g.priority : 'medium';
-  const measureRows = measures.slice(0, 2).map(measure => {
-    const current = measure.current == null ? '—' : Number(measure.current).toLocaleString();
-    const target = measure.target == null ? '' : ` / ${Number(measure.target).toLocaleString()}`;
-    return `<div class="goal-measure-row"><span>${escapeHtml(measure.metric || 'Success measure')}</span><strong>${current}${target}${measure.unit ? ' ' + escapeHtml(measure.unit) : ''}</strong></div>`;
-  }).join('');
+  const when = status === 'completed' ? '✓ Completed' : status === 'archived' ? 'Archived' : deadlineText(g);
   return `
     <article class="goal-card ${status}" data-id="${g.id}" tabindex="0" role="button" aria-label="Open goal: ${escapeHtml(g.title || 'Untitled goal').replace(/"/g, '&quot;')}">
-      <div class="top-row">
-        <span class="category-pill">${escapeHtml(g.category || 'Uncategorized')}</span>
-        <span class="status-tag ${status}"><span aria-hidden="true">${status === 'completed' ? '✓' : status === 'archived' ? '−' : '●'}</span> ${status === 'active' ? 'In progress' : status === 'completed' ? 'Completed' : 'Archived'}</span>
-      </div>
       <div class="goal-card-heading"><span class="priority-dot ${priority}" title="${priority} priority" aria-label="${priority} priority"></span><h3 dir="auto">${escapeHtml(g.title || "Untitled goal")}</h3></div>
-      ${g.specific ? `<p class="desc" dir="auto">${escapeHtml(g.specific)}</p>` : ''}
-      <div class="goal-card-progress">
-        <div class="progress-row"><span>${g.progressSource === "habit" ? "Habit progress" : "Progress"}</span><strong>${progress ?? "—"}<small>%</small></strong></div>
-        <div class="progress-track" role="progressbar" aria-label="Goal progress" aria-valuemin="0" aria-valuemax="100" ${progress===null ? 'aria-valuetext="Unavailable"' : `aria-valuenow="${progress}"`}><div class="progress-fill" style="width:${progress ?? 0}%"></div></div>
-        <div class="goal-progress-caption"><span>${escapeHtml(progressCaption(g))}</span><span>${g.progressSource === "habit" ? "Synced from Habittify" : g.progressSource === "measure" ? "" : g.tasks.length - completedCount + " remaining"}</span></div>
-      </div>
-      ${measures.length ? `<div class="goal-card-measures"><div class="goal-section-label">Success measures${measures.length > 2 ? `<span>+${measures.length - 2} more</span>` : ''}</div>${measureRows}</div>` : ''}
-      <div class="goal-next-task"><span class="goal-section-label">${g.progressSource === "habit" ? "Daily action" : status === 'archived' ? 'Archived goal' : nextTask ? 'Next task' : g.tasks.length ? 'Checklist complete' : 'Get started'}</span><p dir="auto">${escapeHtml(g.progressSource === 'habit' ? (g.habitProgress?.habitName || 'Record attendance in Habittify') : status === 'archived' ? 'Open to review your plan' : nextTask?.title || (g.tasks.length ? 'All planned tasks are done' : 'Add your first task'))}</p></div>
+      <div class="progress-track" role="progressbar" aria-label="Goal progress" aria-valuemin="0" aria-valuemax="100" ${progress===null ? 'aria-valuetext="Unavailable"' : `aria-valuenow="${progress}"`}><div class="progress-fill" style="width:${progress ?? 0}%"></div></div>
       <div class="footer-row">
-        <span class="deadline ${deadlineClass(g)}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>${deadlineText(g)}</span>
-        <span class="goal-open" aria-hidden="true">View goal <span>↗</span></span>
+        <span class="deadline ${deadlineClass(g)}">${escapeHtml(when)}</span>
+        <strong class="goal-card-pct">${progress ?? '—'}${progress === null ? '' : '%'}</strong>
       </div>
     </article>
   `;

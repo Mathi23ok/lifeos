@@ -1,4 +1,4 @@
-import {KEY, dimensions, array, documentState, sources, habitData, summary, goalProgress, today, nextReview} from '../assets/growth-model.js';
+import {KEY, dimensions, array, documentState, sources, habitData, summary, goalProgress, today, nextReview} from '../assets/growth-model.js?v=goals-habits-1';
 import {createReviewStepper} from './review-stepper.js?v=1';
 import {shareReviewImage} from './share-image.js?v=1';
 const $=id=>document.getElementById(id);
@@ -10,7 +10,7 @@ let reviewSaving=false;
 const reviewStepper=createReviewStepper($('reviewDialog'),dimensions);
 for (const id of ['addPlan','reviewBtn','refresh']) $(id).disabled=true;
 const activePlans=id=>doc.plans.filter(p=>p.dimensionId===id && p.status!=='archived');
-const snapshot=s=>({goalPct:s.goalPct,habitPct:s.habitPct,taskPct:s.taskPct,habitAvailable:!!habit,goals:s.goals.length,habits:s.habits.length,tasks:s.tasks.length,done:s.done,completed:s.completed,eligible:s.eligible});
+const snapshot=s=>({goalPct:s.goalPct,habitPct:s.habitPct,habitAvailable:!!habit,goals:s.goals.length,habits:s.habits.length,completed:s.completed,eligible:s.eligible});
 function navigate(page, item={}) {
   const message={type:'growth-open',page,goalId:item.goalId,boardId:item.boardId,cardId:item.cardId};
   if (parent!==window) parent.postMessage(message,location.origin);
@@ -46,7 +46,7 @@ function render() {
       <span class="dimension-head"><span class="dimension-icon" aria-hidden="true">${d.icon}</span><span class="dimension-name">${d.name}</span></span>
       <span class="dimension-score${s.goalPct===null?' is-empty':''}"><strong>${s.goalPct??'—'}</strong>${s.goalPct===null?'':'<small>%</small>'}<span>SMART progress</span></span>
       <span class="track" aria-hidden="true"><span style="width:${s.goalPct??0}%"></span></span>
-      <span class="dimension-foot"><span>Habits <b>${habit?pct(s.habitPct):'—'}</b></span><span>Tasks <b>${s.done}/${s.tasks.length}</b></span><span>Plans <b>${plans.length}</b></span></span>
+      <span class="dimension-foot"><span>Habits <b>${habit?pct(s.habitPct):'—'}</b></span><span>Plans <b>${plans.length}</b></span></span>
     </button>`;
   }).join('');
   const dimension=dimensions.find(d=>d.id===selected);
@@ -57,7 +57,6 @@ function render() {
     const s=summary([p],source,habit);
     const goalRows=s.goals.map(g=>{const value=goalProgress(g,habit),overdue=g.deadline&&g.deadline<today()&&array(g.tasks).some(t=>!t.done);return `<li><button class="link-row" data-goal="${esc(g.id)}"><span dir="auto">${esc(g.title)}</span><span class="link-value${overdue?' warning':''}">${overdue?'Overdue · ':''}${value===null?'No measures':value+'%'}</span></button></li>`;});
     const habitRows=s.habits.map(h=>`<li><button class="link-row" data-page="habittify"><span dir="auto">${esc(h.name)}</span></button></li>`);
-    const taskRows=s.tasks.map(t=>`<li><button class="link-row${t.done?' is-done':''}" data-task="${esc(t.key)}"><span dir="auto">${esc(t.title)}</span><span class="link-value">${t.done?'Done':t.dueDate?esc(shortDate(t.dueDate)):''}</span></button></li>`);
     const status=p.status||'active';
     return `<article class="plan">
       <header class="plan-head">
@@ -68,14 +67,13 @@ function render() {
       <div class="plan-links">
         ${group('SMART goals','<button class="text-link" data-page="goals">Manage</button>',goalRows,'No active goals linked.')}
         ${group('Habits','<button class="text-link" data-page="habittify">Manage</button>',habitRows,habit?'No active habits linked.':'Habits unavailable right now.')}
-        ${group(`Tasks <span class="count">${s.done}/${s.tasks.length}</span>`,'<button class="text-link" data-page="kanban">Kanban</button>',taskRows,'Link cards or a goal with checklist items.')}
       </div>
       ${s.missing?`<p class="plan-warning">${s.missing} saved connection${s.missing===1?' is':'s are'} missing or no longer active. Edit to review.</p>`:''}
     </article>`;
-  }).join(''):'<div class="empty"><strong>No long-term goals here yet.</strong><span>Start with one meaningful direction, then connect the SMART goals, habits and tasks that move it forward.</span></div>';
+  }).join(''):'<div class="empty"><strong>No long-term goals here yet.</strong><span>Start with one meaningful direction, then connect the SMART goals and habits that move it forward.</span></div>';
   $('history').innerHTML=doc.reviews.length?[...doc.reviews].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).map(r=>{
     const noted=dimensions.filter(d=>r.notes?.[d.id]?.reflection||r.notes?.[d.id]?.next);
-    return `<details class="history-entry"><summary><span class="history-name">${esc(capital(r.cadence))} review</span><span class="history-meta">${noted.length} of ${dimensions.length} reflected</span><span class="history-date">${esc(prettyDate(r.date))}</span></summary><div class="history-actions"><button class="ghost share-btn" data-share="${esc(r.id)}">${shareIcon}Share as image</button><span>Scores only. Your reflections stay private.</span></div><div class="review-notes">${noted.map(d=>{const n=r.notes[d.id],s=r.snapshot?.[d.id]||{};return `<article class="review-note" style="--tone:${d.color}"><header><h3>${d.name}</h3><small>SMART ${pct(s.goalPct??null)} · Habits ${pct(s.habitPct??null)} · Tasks ${s.done??0}/${s.tasks??0}</small></header>${n.reflection?`<p dir="auto">${esc(n.reflection)}</p>`:''}${n.next?`<p class="review-next" dir="auto"><span>Next</span>${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`;
+    return `<details class="history-entry"><summary><span class="history-name">${esc(capital(r.cadence))} review</span><span class="history-meta">${noted.length} of ${dimensions.length} reflected</span><span class="history-date">${esc(prettyDate(r.date))}</span></summary><div class="history-actions"><button class="ghost share-btn" data-share="${esc(r.id)}">${shareIcon}Share as image</button><span>Scores only. Your reflections stay private.</span></div><div class="review-notes">${noted.map(d=>{const n=r.notes[d.id],s=r.snapshot?.[d.id]||{};return `<article class="review-note" style="--tone:${d.color}"><header><h3>${d.name}</h3><small>SMART ${pct(s.goalPct??null)} · Habits ${pct(s.habitPct??null)}</small></header>${n.reflection?`<p dir="auto">${esc(n.reflection)}</p>`:''}${n.next?`<p class="review-next" dir="auto"><span>Next</span>${esc(n.next)}</p>`:''}</article>`;}).join('')}</div></details>`;
   }).join(''):'<div class="empty"><strong>No reviews yet.</strong><span>Your first review captures wins, obstacles and one practical next step for each dimension.</span></div>';
 }
 async function refresh() {
@@ -95,7 +93,7 @@ function openPlan(id=null) {
   $('planDimension').innerHTML=dimensions.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
   $('planDimension').value=editing?.dimensionId||selected;
   $('planTitle').value=editing?.title||'';$('planWhy').value=editing?.why||'';$('planDate').value=editing?.targetDate||'';$('planState').value=editing?.status||'active';
-  $('pickers').innerHTML=picker('goalIds','SMART goals',source.goals.map(g=>({id:String(g.id),title:g.title,group:g.status==='archived'?'Archived':g.category})),editing?.goalIds)+picker('habitIds','Habits',habit?.habits.map(h=>({id:String(h.id),title:h.name,group:h.category}))||[],editing?.habitIds,!habit)+picker('taskKeys','Tasks',source.tasks.map(t=>({id:t.key,title:t.title,group:t.group+(t.done?' · done':'')+(t.archived?' · archived':'' )})),editing?.taskKeys);
+  $('pickers').innerHTML=picker('goalIds','SMART goals',source.goals.map(g=>({id:String(g.id),title:g.title,group:g.status==='archived'?'Archived':g.category})),editing?.goalIds)+picker('habitIds','Habits',habit?.habits.map(h=>({id:String(h.id),title:h.name,group:h.category}))||[],editing?.habitIds,!habit);
   $('planError').textContent='';$('planDialog').showModal();$('planTitle').focus();
 }
 function openReview(cadence='weekly') {
@@ -120,7 +118,8 @@ $('planForm').onsubmit=async event=>{
   $('savePlan').disabled=true;
   try {
     const current=documentState(),form=new FormData(event.target),now=new Date().toISOString();
-    const plan={...editing,id:editing?.id||crypto.randomUUID(),dimensionId:$('planDimension').value,title:$('planTitle').value.trim(),why:$('planWhy').value.trim(),targetDate:$('planDate').value||null,status:$('planState').value,goalIds:form.getAll('goalIds'),habitIds:habit?form.getAll('habitIds'):array(editing?.habitIds),taskKeys:form.getAll('taskKeys'),createdAt:editing?.createdAt||now,updatedAt:now};
+    const {taskKeys:_droppedTasks,...kept}=editing||{};
+    const plan={...kept,id:editing?.id||crypto.randomUUID(),dimensionId:$('planDimension').value,title:$('planTitle').value.trim(),why:$('planWhy').value.trim(),targetDate:$('planDate').value||null,status:$('planState').value,goalIds:form.getAll('goalIds'),habitIds:habit?form.getAll('habitIds'):array(editing?.habitIds),createdAt:editing?.createdAt||now,updatedAt:now};
     const next={...current,plans:editing?current.plans.map(p=>p.id===editing.id?plan:p):[...current.plans,plan]};
     await persist(next);selected=plan.dimensionId;location.hash=selected;render();$('planDialog').close();
   }catch(error){$('planError').textContent=error.message;}finally{$('savePlan').disabled=false;}
@@ -151,7 +150,6 @@ document.addEventListener('click',event=>{
   if(button.dataset.edit)openPlan(button.dataset.edit);
   if(button.dataset.page)navigate(button.dataset.page);
   if(button.dataset.goal)navigate('goals',{goalId:button.dataset.goal});
-  if(button.dataset.task){const task=source.tasks.find(t=>t.key===button.dataset.task);if(task)navigate(task.page,task);}
 });
 document.addEventListener('input',event=>{if(!event.target.matches('.picker-search'))return;const q=event.target.value.toLowerCase();for(const row of event.target.closest('fieldset').querySelectorAll('[data-search]'))row.hidden=!row.dataset.search.includes(q);});
 for (const dialog of [$('planDialog'),$('reviewDialog')]) dialog.addEventListener('cancel',event=>{if(dialog.id==='reviewDialog'?reviewSaving:$('savePlan').disabled)event.preventDefault();});

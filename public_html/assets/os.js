@@ -1,6 +1,6 @@
 import { mountFocusAudio } from './focus-audio.js?v=playlist-1';
 import { remainingSeconds, nextMode } from './timer.mjs';
-import { mountDashboard, refreshDashboard } from './dashboard.js?v=habit-goals-1';
+import { mountDashboard, refreshDashboard } from './dashboard.js?v=goals-habits-2';
 import { mountMobileNavigation } from './mobile-nav.js?v=growth-1';
 await window.appStorageReady;
 mountDashboard();
@@ -33,6 +33,8 @@ addEventListener('message',event=>{
   if(page==='kanban'){if(typeof boardId==='string')url.searchParams.set('board',boardId);if(typeof cardId==='string')url.searchParams.set('card',cardId);}
   frame.src=url.href;location.hash='#'+page;
 });
+// Keep planning together in the menu: Growth, then Goals, then Habittify.
+{const growthLink=document.querySelector('nav a[href="#growth"]'),goalsLink=document.querySelector('nav a[href="#goals"]'),habitsLink=document.querySelector('nav a[href="#habittify"]');if(growthLink&&goalsLink&&habitsLink){growthLink.after(goalsLink);goalsLink.after(habitsLink);}}
 mountMobileNavigation();
 let data;try{data=JSON.parse(appStorage.getItem('edi_focus_v1'))}catch{}
 data={history:[],lengths:{focus:25,short:5,long:15},mode:'focus',remaining:1500,deadline:null,round:0,...data};

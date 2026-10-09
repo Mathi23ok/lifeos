@@ -1,7 +1,7 @@
 import './goal-progress.js';
 import { refreshWeatherCard } from './weather.js?v=weather-7d-1';
 import { remainingSeconds } from './timer.mjs';
-import { mountGrowthOverview, refreshGrowthOverview } from './growth-overview.js';
+import { mountGrowthOverview, refreshGrowthOverview } from './growth-overview.js?v=goals-habits-1';
 
 const readJson = (key) => {
   try { return JSON.parse(appStorage.getItem(key) || 'null'); } catch { return null; }

@@ -25,11 +25,7 @@ export const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Tehr
 export function addDays(day, count) { const date = new Date(day+'T12:00:00Z'); date.setUTCDate(date.getUTCDate()+count); return date.toISOString().slice(0,10); }
 export function sources() {
   const goals = array(read('edi_goals_v1').goals);
-  const tasks = goals.flatMap(goal => array(goal.tasks).map(task => ({...task, key:JSON.stringify(['goal',String(goal.id),String(task.id)]), page:'goals', goalId:goal.id, group:goal.title, archived:goal.status==='archived'})));
-  for (const board of array(read('kanban_boards_v1').boards)) for (const column of array(board.columns)) for (const card of array(column.cards)) {
-    tasks.push({...card, key:JSON.stringify(['kanban',String(card.id)]), page:'kanban', boardId:board.id, cardId:card.id, group:board.name+' / '+column.name, done:!!card.completed || /^(done|complete|completed)$/i.test((column.name||'').trim())});
-  }
-  return {goals,tasks};
+  return {goals};
 }
 export async function habitData() {
   return LifeGoalProgress.load(sources().goals,true);
@@ -47,10 +43,7 @@ export function goalProgress(goal, habit = null) {
 export function summary(plans, source, habit) {
   const goalIds=new Set(plans.flatMap(p=>array(p.goalIds)).map(String));
   const habitIds=new Set(plans.flatMap(p=>array(p.habitIds)).map(String));
-  const taskKeys=new Set(plans.flatMap(p=>array(p.taskKeys)));
   const goals=source.goals.filter(g=>goalIds.has(String(g.id)) && g.status!=='archived');
-  for (const task of source.tasks) if (task.page==='goals' && goalIds.has(String(task.goalId)) && !task.archived) taskKeys.add(task.key);
-  const tasks=source.tasks.filter(t=>taskKeys.has(t.key) && !t.archived);
   const habits=habit ? habit.habits.filter(h=>habitIds.has(String(h.id))) : [];
   const percentages=goals.map(g=>goalProgress(g,habit)).filter(p=>p!==null);
   let eligible=0, completed=0;
@@ -61,8 +54,8 @@ export function summary(plans, source, habit) {
     if (created && day<created) continue;
     eligible++; if (array(habit.logs[day]).map(String).includes(String(h.id))) completed++;
   }
-  const missing= [...goalIds].filter(id=>!source.goals.some(g=>String(g.id)===id)).length + [...taskKeys].filter(key=>!source.tasks.some(t=>t.key===key)).length + (habit ? [...habitIds].filter(id=>!habit.habits.some(h=>String(h.id)===id)).length : 0);
-  return {goals,tasks,habits,goalPct:percentages.length?Math.round(percentages.reduce((a,b)=>a+b,0)/percentages.length):null,habitPct:eligible?Math.round(completed/eligible*100):null,taskPct:tasks.length?Math.round(tasks.filter(t=>t.done).length/tasks.length*100):null,done:tasks.filter(t=>t.done).length,eligible,completed,missing,habitLinks:habitIds.size};
+  const missing= [...goalIds].filter(id=>!source.goals.some(g=>String(g.id)===id)).length + (habit ? [...habitIds].filter(id=>!habit.habits.some(h=>String(h.id)===id)).length : 0);
+  return {goals,habits,goalPct:percentages.length?Math.round(percentages.reduce((a,b)=>a+b,0)/percentages.length):null,habitPct:eligible?Math.round(completed/eligible*100):null,eligible,completed,missing,habitLinks:habitIds.size};
 }
 export const cadenceDays={weekly:7,monthly:30,quarterly:90};
 export function nextReview(doc, cadence) {
